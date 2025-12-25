@@ -3,8 +3,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { 
     Pencil, Eraser, Trash2, Download, Save, ZoomIn, ZoomOut, 
     Maximize2, X, RefreshCw, CheckCircle, Cloud, Palette,
-    Undo2, Redo2, CloudOff, ShieldCheck, Maximize, Hand,
-    Square, Circle, MoveRight, CornerRightUp, Diamond, RectangleHorizontal, Shapes, ChevronDown
+    Undo2, Redo2, Maximize, Hand,
+    Square, Circle, MoveRight, CornerRightUp, Diamond, RectangleHorizontal, Shapes, ChevronDown, AlertCircle
 } from 'lucide-react';
 import { googleDriveService } from '../services/googleDrive';
 
@@ -47,7 +47,8 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
 
     const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#000000', '#ffffff'];
 
-    const isDeviceActive = googleDriveLinked && googleDriveService.hasActiveToken();
+    // Logic for the warning: show only if a drawing exists but has no drive ID
+    const isUnsynced = patient?.rctDrawing && !patient?.rctDrawingDriveId;
 
     useEffect(() => {
         const bgCanvas = bgCanvasRef.current;
@@ -164,9 +165,7 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
         const dy = current.y - start.y;
 
         switch (tool) {
-            case 'rect':
-                ctx.strokeRect(start.x, start.y, dx, dy);
-                break;
+            case 'rect': ctx.strokeRect(start.x, start.y, dx, dy); break;
             case 'square':
                 const size = Math.abs(dx) > Math.abs(dy) ? dx : dy;
                 ctx.strokeRect(start.x, start.y, size, size);
@@ -198,8 +197,6 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
                 ctx.moveTo(start.x, start.y);
                 ctx.lineTo(current.x, current.y);
                 ctx.stroke();
-                
-                // Filled Arrow Head
                 ctx.beginPath();
                 ctx.moveTo(current.x, current.y);
                 ctx.lineTo(current.x - headlen * Math.cos(angle - Math.PI / 6), current.y - headlen * Math.sin(angle - Math.PI / 6));
@@ -212,12 +209,10 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
                 const cp1y = start.y + dy;
                 const cp2x = start.x + (dx * 3) / 4;
                 const cp2y = start.y - dy / 2;
-                
                 ctx.beginPath();
                 ctx.moveTo(start.x, start.y);
                 ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, current.x, current.y);
                 ctx.stroke();
-
                 const cAngle = Math.atan2(current.y - cp2y, current.x - cp2x);
                 const cHeadlen = brushSize * 4;
                 ctx.beginPath();
@@ -232,19 +227,15 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
 
     const handleMouseDown = (e: React.MouseEvent | React.TouchEvent) => {
         const { x, y, rawX, rawY } = getCoords(e);
-        
         if (tool === 'pan') {
             setIsPanning(true);
             setLastPosition({ x: rawX, y: rawY });
             return;
         }
-
         const ctx = drawingCanvasRef.current?.getContext('2d');
         if (!ctx) return;
-
         setStartPoint({ x, y });
         setIsDrawing(true);
-
         if (tool === 'pen' || tool === 'eraser') {
             ctx.beginPath();
             ctx.moveTo(x, y);
@@ -263,7 +254,6 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
 
     const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
         const coords = getCoords(e);
-
         if (isPanning) {
             const dx = coords.rawX - lastPosition.x;
             const dy = coords.rawY - lastPosition.y;
@@ -271,39 +261,27 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
             setLastPosition({ x: coords.rawX, y: coords.rawY });
             return;
         }
-
         if (!isDrawing) return;
-        
         const ctx = drawingCanvasRef.current?.getContext('2d');
         if (!ctx) return;
-
         if (tool === 'pen' || tool === 'eraser') {
             ctx.lineTo(coords.x, coords.y);
             ctx.stroke();
         } else {
-            // Shape Preview Logic
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.clearRect(0, 0, drawingCanvasRef.current!.width, drawingCanvasRef.current!.height);
             ctx.restore();
-            
             const img = new Image();
             img.src = history[historyStep];
             ctx.drawImage(img, 0, 0, canvasSize.width, canvasSize.height);
-            
             drawShape(ctx, startPoint, { x: coords.x, y: coords.y });
         }
     };
 
     const handleMouseUp = () => {
-        if (isPanning) {
-            setIsPanning(false);
-            return;
-        }
-        if (isDrawing) {
-            setIsDrawing(false);
-            saveToHistory();
-        }
+        if (isPanning) { setIsPanning(false); return; }
+        if (isDrawing) { setIsDrawing(false); saveToHistory(); }
     };
 
     const handleClear = () => {
@@ -320,38 +298,9 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
 
     const handleSave = async () => {
         const drawCanvas = drawingCanvasRef.current;
-        const bgCanvas = bgCanvasRef.current;
-        if (!drawCanvas || !bgCanvas) return;
-
-        const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = canvasSize.width * SCALE_FACTOR;
-        finalCanvas.height = canvasSize.height * SCALE_FACTOR;
-        const fCtx = finalCanvas.getContext('2d');
-        if (!fCtx) return;
-
-        fCtx.drawImage(bgCanvas, 0, 0);
-        fCtx.drawImage(drawCanvas, 0, 0);
-
-        const dataUrl = finalCanvas.toDataURL('image/png', 1.0);
-        
+        if (!drawCanvas) return;
         onSave(drawCanvas.toDataURL('image/png', 1.0));
         setShowMsg(t.saveSuccessLocal);
-        
-        if (isDeviceActive && patient) {
-            setIsSyncing(true);
-            try {
-                const blob = await (await fetch(dataUrl)).blob();
-                const file = new File([blob], `RCT_${patient.name}_${new Date().getTime()}.png`, { type: 'image/png' });
-                const rootId = await googleDriveService.ensureRootFolder();
-                const patientFolderId = await googleDriveService.ensurePatientFolder(rootId, patient);
-                await googleDriveService.uploadFile(patientFolderId, file);
-                setShowMsg(t.saveSuccessDrive);
-            } catch (err) {
-                console.error("Drive sync failed", err);
-            } finally {
-                setIsSyncing(false);
-            }
-        }
         setTimeout(() => setShowMsg(''), 4000);
     };
 
@@ -384,8 +333,9 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
             <div className="p-3 md:p-4 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-2 md:gap-4 bg-gray-50 dark:bg-gray-800/80 sticky top-0 z-50">
                 <div className="flex items-center gap-2 md:gap-3">
                     <div className="p-2 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-xl"><Maximize size={18} className="md:w-5 md:h-5" /></div>
-                    <div className="hidden sm:block">
-                        <h4 className="font-bold text-gray-800 dark:text-white text-xs md:text-sm">{t.rctTool}</h4>
+                    <div>
+                        {/* Title visible on mobile as requested */}
+                        <h4 className="font-bold text-gray-800 dark:text-white text-[10px] md:text-sm block">{t.rctTool}</h4>
                     </div>
                 </div>
 
@@ -432,9 +382,10 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
                         <button onClick={() => setTool('pan')} className={`p-1.5 md:p-2 rounded-lg transition ${tool === 'pan' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-500'}`} title="Move"><Hand size={16} className="md:w-[18px] md:h-[18px]" /></button>
                     </div>
 
-                    <div className="hidden sm:flex items-center gap-1 bg-white dark:bg-gray-700 p-1 rounded-xl border border-gray-100 dark:border-gray-600">
+                    {/* Colors visible on mobile as requested */}
+                    <div className="flex items-center gap-1 bg-white dark:bg-gray-700 p-1 rounded-xl border border-gray-100 dark:border-gray-600">
                         {colors.map(c => (
-                            <button key={c} onClick={() => { setColor(c); }} className={`w-5 h-5 rounded-full border-2 transition-transform hover:scale-110 ${color === c ? 'border-gray-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} />
+                            <button key={c} onClick={() => { setColor(c); }} className={`w-4 h-4 md:w-5 md:h-5 rounded-full border transition-transform hover:scale-110 ${color === c ? 'border-gray-400 scale-110' : 'border-transparent'}`} style={{ backgroundColor: c }} />
                         ))}
                     </div>
 
@@ -472,7 +423,6 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
                         style={{ width: '100%', height: 'auto', aspectRatio: `${canvasSize.width} / ${canvasSize.height}` }}
                         className="absolute inset-0 pointer-events-none"
                     />
-                    
                     <canvas 
                         ref={drawingCanvasRef}
                         style={{ width: '100%', height: 'auto', aspectRatio: `${canvasSize.width} / ${canvasSize.height}`, touchAction: 'none' }}
@@ -506,8 +456,20 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
                 </div>
             </div>
 
-            <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-between items-center gap-4">
-                <div className="flex items-center gap-4">
+            {/* Footer with updated responsive layout */}
+            <div className="p-6 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col gap-4">
+                <div className="flex items-center gap-2 w-full">
+                    {/* Big Save Button */}
+                    <button 
+                        onClick={handleSave}
+                        disabled={isSyncing}
+                        className="flex-1 px-8 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold shadow-xl shadow-primary-500/30 transition transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {isSyncing ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
+                        {t.save}
+                    </button>
+
+                    {/* Download Button beside Save - Now equal in size */}
                     <button 
                         onClick={() => {
                             const finalCanvas = document.createElement('canvas');
@@ -523,36 +485,21 @@ export const RCTDrawingBoard: React.FC<RCTDrawingBoardProps> = ({ t, initialDraw
                                 link.click();
                             }
                         }}
-                        className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white rounded-2xl font-bold text-sm hover:bg-gray-200 transition flex items-center gap-2"
+                        className="flex-1 py-3.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white rounded-2xl font-bold text-sm hover:bg-gray-200 transition flex items-center justify-center gap-2"
+                        title={isRTL ? 'تحميل' : 'Download'}
                     >
-                        <Download size={20} /> {isRTL ? 'تحميل' : 'Download'}
+                        <Download size={20} />
+                        <span>{isRTL ? 'تحميل' : 'Download'}</span>
                     </button>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="hidden md:flex items-center gap-2">
-                        {isDeviceActive ? (
-                            <div className="flex items-center gap-1.5 text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full border border-green-100 dark:border-green-800">
-                                <Cloud size={14} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">{t.linked}</span>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-1.5 text-gray-400 bg-gray-50 dark:bg-gray-700/50 px-3 py-1.5 rounded-full border border-gray-100 dark:border-gray-100">
-                                <CloudOff size={14} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">{t.notLinked}</span>
-                            </div>
-                        )}
+                {/* Warning static alert underneath on mobile */}
+                {isUnsynced && googleDriveLinked && (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-orange-50 dark:bg-orange-900/20 text-orange-600 border border-orange-100 dark:border-orange-800 rounded-2xl w-full">
+                        <AlertCircle size={20} className="shrink-0" />
+                        <span className="text-[11px] md:text-xs font-bold leading-relaxed">{t.rctLocalSaveWarning}</span>
                     </div>
-                    
-                    <button 
-                        onClick={handleSave}
-                        disabled={isSyncing}
-                        className="px-10 py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold shadow-xl shadow-primary-500/30 transition transform hover:-translate-y-0.5 active:scale-95 flex items-center gap-2 disabled:opacity-50"
-                    >
-                        {isSyncing ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
-                        {t.save}
-                    </button>
-                </div>
+                )}
             </div>
         </div>
     );

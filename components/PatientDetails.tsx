@@ -1,12 +1,12 @@
 
-import React, { useState } from 'react';
-import { User, Activity, Calendar, CreditCard, Pill, ArrowLeft, Edit2, Trash2, Phone, Copy, MessageCircle, ClipboardList, StickyNote, Plus, Printer, Check, X as XIcon, History, DollarSign, Upload, FileText, HelpCircle, Stethoscope, ChevronDown, Smile, AlertCircle, Settings, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User, Activity, Calendar, CreditCard, Pill, ArrowLeft, Edit2, Trash2, Phone, Copy, MessageCircle, ClipboardList, StickyNote, Plus, Printer, Check, X as XIcon, History, DollarSign, Upload, FileText, HelpCircle, Stethoscope, ChevronDown, Smile, AlertCircle, Settings, Image as ImageIcon, Camera } from 'lucide-react';
 import { TabButton, InfoItem } from './Shared';
 import { TeethChart } from './TeethChart';
 import { CATEGORIES, STATUS_COLORS, CURRENCY_LIST, MEDICAL_CONDITIONS_LIST, PATIENT_QUESTIONS_LIST } from '../constants';
 import { getLocalizedDate, formatTime12, getTreatmentLabel } from '../utils';
 import { ClinicData, Patient, Appointment, DocumentTemplate, MedicalConditionItem, PatientQueryAnswer, ToothNote, Payment } from '../types';
-import { DocumentModal, MedicalHistoryModal, PatientQueriesModal, PaymentModal, RxSettingsModal } from './AppModals';
+import { DocumentSettingsModal, MedicalHistoryModal, PatientQueriesModal, PaymentModal, RxSettingsModal } from './AppModals';
 import { PatientImages } from './PatientImages';
 import { RCTDrawingBoard } from './RCTDrawingBoard';
 
@@ -45,7 +45,7 @@ interface PatientDetailsProps {
   setShowRxModal: (show: boolean) => void;
   setShowAddMasterDrugModal: (show: boolean) => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
-  setPrintingDocument: (doc: { type: 'consent' | 'instructions', text: string, align: 'left'|'center'|'right', fontSize: number } | null) => void;
+  setPrintingDocument: (doc: { type: 'consent' | 'instructions', text: string, align: 'left'|'center'|'right', fontSize: number, topMargin: number } | null) => void;
   isSecretary?: boolean;
 }
 
@@ -60,8 +60,8 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({
   isSecretary
 }) => {
   const [rctInput, setRctInput] = useState({ tooth: '', canal: '', length: '' });
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [documentType, setDocumentType] = useState<'consent' | 'instructions'>('consent');
+  const [showDocSettingsModal, setShowDocSettingsModal] = useState(false);
+  const [docSettingsType, setDocSettingsType] = useState<'consent' | 'instructions'>('consent');
   
   const [showMedicalHistoryModal, setShowMedicalHistoryModal] = useState(false);
   const [showPatientQueriesModal, setShowPatientQueriesModal] = useState(false);
@@ -71,40 +71,26 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({
   const [localPaymentModalOpen, setLocalPaymentModalOpen] = useState(false);
   const [localPaymentType, setLocalPaymentType] = useState<'payment' | 'charge'>('payment');
   
-  const handleDocumentFileUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'consent' | 'instructions') => {
-      const file = e.target.files?.[0];
-      if (file) {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-              const base64String = reader.result as string;
-              setData(prev => ({
-                  ...prev,
-                  settings: {
-                      ...prev.settings,
-                      consentBackgroundImage: type === 'consent' ? base64String : prev.settings.consentBackgroundImage,
-                      instructionsBackgroundImage: type === 'instructions' ? base64String : prev.settings.instructionsBackgroundImage
-                  }
-              }));
-          };
-          reader.readAsDataURL(file);
+  const profilePicInputRef = useRef<HTMLInputElement>(null);
+
+  const openDocSettings = (type: 'consent' | 'instructions') => {
+      setDocSettingsType(type);
+      setShowDocSettingsModal(true);
+  };
+
+  const handleQuickPrint = (type: 'consent' | 'instructions') => {
+      const settings = type === 'consent' ? data.settings.consentSettings : data.settings.instructionSettings;
+      if (!settings || !settings.text) {
+          alert(isRTL ? "يرجى كتابة نص المطبوع في الإعدادات أولاً" : "Please write the document text in settings first.");
+          return;
       }
-  };
-
-  const openDocumentModal = (type: 'consent' | 'instructions') => {
-      setDocumentType(type);
-      setShowDocumentModal(true);
-  };
-
-  const handlePrintDocument = (docData: { text: string, align: 'left'|'center'|'right', fontSize: number }) => {
-      setPrintingDocument({ type: documentType, ...docData });
-      setShowDocumentModal(false);
-  };
-
-  const handleSaveTemplate = (template: DocumentTemplate) => {
-      setData(prev => ({
-          ...prev,
-          documentTemplates: [...(prev.documentTemplates || []), template]
-      }));
+      setPrintingDocument({ 
+          type, 
+          text: settings.text, 
+          align: settings.align, 
+          fontSize: settings.fontSize,
+          topMargin: settings.topMargin
+      });
   };
 
   const handleSaveMedicalHistory = (conditions: MedicalConditionItem[]) => {
@@ -160,17 +146,28 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({
       setLocalPaymentModalOpen(true);
   };
 
+  const handleProfilePicUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              updatePatient(activePatient.id, { profilePicture: reader.result as string, profilePictureDriveId: undefined });
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in w-full pb-10">
       
-      <DocumentModal 
-        show={showDocumentModal} 
-        onClose={() => setShowDocumentModal(false)}
+      <DocumentSettingsModal 
+        show={showDocSettingsModal}
+        onClose={() => setShowDocSettingsModal(false)}
         t={t}
-        type={documentType}
         data={data}
-        onPrint={handlePrintDocument}
-        onSaveTemplate={handleSaveTemplate}
+        setData={setData}
+        currentLang={currentLang}
+        type={docSettingsType}
       />
 
       <MedicalHistoryModal
@@ -221,8 +218,29 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({
                 <ArrowLeft size={20} className="rtl:rotate-180" /> {t.back}
             </button>
 
-            <div className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-4xl relative shadow-inner overflow-hidden group shrink-0 mx-auto md:mx-0">
-                <span>{activePatient.gender === 'male' ? '👨' : '👩'}</span>
+            {/* Profile Picture Circle */}
+            <div 
+                onClick={() => profilePicInputRef.current?.click()}
+                className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl relative shadow-inner overflow-hidden group shrink-0 mx-auto md:mx-0 border-4 border-white dark:border-gray-700 cursor-pointer transition-all ${STATUS_COLORS[activePatient.status].split(' ')[0]}`}
+            >
+                {activePatient.profilePicture ? (
+                    <img src={activePatient.profilePicture} alt="" className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                ) : (
+                    <span>{activePatient.gender === 'male' ? '👨' : '👩'}</span>
+                )}
+                
+                {/* Upload Overlay */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                    <Camera size={24} />
+                </div>
+                
+                <input 
+                    type="file" 
+                    ref={profilePicInputRef} 
+                    className="hidden" 
+                    accept="image/*" 
+                    onChange={handleProfilePicUpload} 
+                />
             </div>
 
             <div className="flex-1 text-center md:text-start w-full">
@@ -594,7 +612,7 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({
                  </div>
               ) : (
                  [...activePatient.appointments].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(appt => (
-                  <div key={appt.id} className="flex flex-col sm:flex-row gap-4 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-600 items-start sm:items-center">
+                  <div key={appt.id} className="flex flex-col sm:flex-row gap-4 bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-700 items-start sm:items-center">
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-1">
                             <span className="font-bold text-gray-800 dark:text-white">
@@ -650,7 +668,7 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({
                     </div>
                 </div>
                 <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-2xl border border-green-100 dark:border-green-800">
-                    <span className="text-xs font-bold text-green-600 dark:text-green-400 uppercase">{t.totalPaid}</span>
+                    <span className="text-xs font-bold text-green-600 dark:text-blue-400 uppercase">{t.totalPaid}</span>
                     <div className="text-2xl font-bold text-green-700 dark:text-blue-300">
                         {data.settings.currency} {activePatient.payments.filter(p => p.type === 'payment').reduce((acc, curr) => acc + curr.amount, 0)}
                     </div>
@@ -811,60 +829,74 @@ export const PatientDetails: React.FC<PatientDetailsProps> = ({
                  <FileText className="text-primary-500" /> {t.documents}
               </h3>
               
-              <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 rounded-2xl p-6 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-bl-xl">
+              <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 rounded-[2rem] p-6 md:p-8 relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 bg-blue-100 text-blue-700 text-xs font-bold px-4 py-1.5 rounded-bl-2xl">
                        {t.paperSizeA4}
                    </div>
-                   <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t.consentForm}</h4>
                    
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <label className="flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 hover:border-primary-500 dark:hover:border-primary-400 cursor-pointer transition gap-2 group">
-                            <Upload size={24} className="text-gray-400 group-hover:text-primary-500" />
-                            <span className="text-sm font-bold text-gray-500 group-hover:text-primary-500">{t.uploadBg}</span>
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleDocumentFileUpload(e, 'consent')} />
-                       </label>
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                       <div className="flex items-center gap-4">
+                            <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm text-blue-600 group-hover:rotate-6 transition-transform">
+                                <FileText size={32} />
+                            </div>
+                            <div>
+                                <h4 className="text-xl font-bold text-gray-800 dark:text-white leading-tight">{t.consentForm}</h4>
+                                <p className="text-xs text-gray-400 font-medium uppercase mt-1 tracking-wider">A4 Standard Format</p>
+                            </div>
+                       </div>
                        
-                       <div className="flex flex-col gap-2">
-                           <button onClick={() => openDocumentModal('consent')} className="flex-1 flex flex-col items-center justify-center p-4 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-500/30 hover:bg-primary-700 transition gap-2">
-                                <Printer size={24} />
-                                <span className="text-sm font-bold">{t.printDocument}</span>
+                       <div className="flex gap-3">
+                           <button 
+                                onClick={() => openDocSettings('consent')}
+                                className="px-6 py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-white rounded-2xl font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2 shadow-sm"
+                           >
+                                <Settings size={18} />
+                                <span>{t.settings}</span>
+                           </button>
+                           <button 
+                                onClick={() => handleQuickPrint('consent')}
+                                className="px-8 py-3.5 bg-primary-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 transition flex items-center justify-center gap-2 transform hover:-translate-y-0.5 active:scale-95"
+                           >
+                                <Printer size={20} />
+                                <span>{t.print}</span>
                            </button>
                        </div>
                    </div>
-                   
-                   {data.settings.consentBackgroundImage && (
-                       <div className="mt-4 text-xs text-green-600 flex items-center gap-1">
-                           <Check size={12} /> {t.bgImageSet}
-                       </div>
-                   )}
               </div>
 
-              <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 rounded-2xl p-6 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 bg-purple-100 text-purple-700 text-xs font-bold px-3 py-1 rounded-bl-xl">
+              <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 rounded-[2rem] p-6 md:p-8 relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 bg-purple-100 text-purple-700 text-xs font-bold px-4 py-1.5 rounded-bl-2xl">
                        {t.paperSizeA5}
                    </div>
-                   <h4 className="text-lg font-bold text-gray-800 dark:text-white mb-4">{t.patientInstructions}</h4>
-                   
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <label className="flex flex-col items-center justify-center p-4 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 hover:border-primary-500 dark:hover:border-primary-400 cursor-pointer transition gap-2 group">
-                            <Upload size={24} className="text-gray-400 group-hover:text-primary-500" />
-                            <span className="text-sm font-bold text-gray-500 group-hover:text-primary-500">{t.uploadBg}</span>
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleDocumentFileUpload(e, 'instructions')} />
-                       </label>
+
+                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                       <div className="flex items-center gap-4">
+                            <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm text-purple-600 group-hover:rotate-6 transition-transform">
+                                <FileText size={32} />
+                            </div>
+                            <div>
+                                <h4 className="text-xl font-bold text-gray-800 dark:text-white leading-tight">{t.patientInstructions}</h4>
+                                <p className="text-xs text-gray-400 font-medium uppercase mt-1 tracking-wider">A5 Small Format</p>
+                            </div>
+                       </div>
                        
-                       <div className="flex flex-col gap-2">
-                           <button onClick={() => openDocumentModal('instructions')} className="flex-1 flex flex-col items-center justify-center p-4 bg-primary-600 text-white rounded-xl shadow-lg shadow-primary-500/30 hover:bg-primary-700 transition gap-2">
-                                <Printer size={24} />
-                                <span className="text-sm font-bold">{t.printDocument}</span>
+                       <div className="flex gap-3">
+                           <button 
+                                onClick={() => openDocSettings('instructions')}
+                                className="px-6 py-3.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-white rounded-2xl font-bold text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition flex items-center gap-2 shadow-sm"
+                           >
+                                <Settings size={18} />
+                                <span>{t.settings}</span>
+                           </button>
+                           <button 
+                                onClick={() => handleQuickPrint('instructions')}
+                                className="px-8 py-3.5 bg-primary-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-primary-500/30 hover:bg-primary-700 transition flex items-center justify-center gap-2 transform hover:-translate-y-0.5 active:scale-95"
+                           >
+                                <Printer size={20} />
+                                <span>{t.print}</span>
                            </button>
                        </div>
                    </div>
-                   
-                   {data.settings.instructionsBackgroundImage && (
-                       <div className="mt-4 text-xs text-green-600 flex items-center gap-1">
-                           <Check size={12} /> {t.bgImageSet}
-                       </div>
-                   )}
               </div>
           </div>
         )}

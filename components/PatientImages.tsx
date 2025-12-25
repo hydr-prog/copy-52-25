@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Image as ImageIcon, Upload, Trash2, Maximize2, X, Cloud, Link, FileImage, Download, Loader2, Info, CheckCircle, AlertTriangle, RefreshCw, Key, ShieldCheck, ShieldAlert, ZoomIn, ZoomOut, RotateCw, RotateCcw, DownloadCloud, Maximize } from 'lucide-react';
+import { Image as ImageIcon, Upload, Trash2, Maximize2, X, Cloud, Link, FileImage, Download, Loader2, Info, CheckCircle, AlertTriangle, RefreshCw, Key, ShieldCheck, ShieldAlert, ZoomIn, ZoomOut, RotateCw, RotateCcw, DownloadCloud, Maximize, AlertCircle } from 'lucide-react';
 import { Patient, PatientImage } from '../types';
 import { googleDriveService } from '../services/googleDrive';
 
@@ -12,9 +12,6 @@ interface DriveImageItemProps {
 }
 
 const DriveImageItem: React.FC<DriveImageItemProps> = ({ img, onMaximize, onDelete, t }) => {
-    const [displayUrl, setDisplayUrl] = useState<string>(img.url);
-    const [isLoading, setIsLoading] = useState(false);
-
     return (
         <div className="group relative aspect-square bg-gray-100 dark:bg-gray-700 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-600 shadow-sm hover:shadow-md transition-all">
             <img 
@@ -24,21 +21,28 @@ const DriveImageItem: React.FC<DriveImageItemProps> = ({ img, onMaximize, onDele
                 loading="lazy"
             />
             
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <button onClick={() => onMaximize(img)} className="p-3 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/40 transition transform hover:scale-110">
+            {/* Buttons Overlay: Always visible on mobile, hover on desktop */}
+            <div className="absolute inset-0 bg-black/30 md:bg-black/40 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                <button 
+                    onClick={() => onMaximize(img)} 
+                    className="p-3 md:p-3 bg-white/30 backdrop-blur-md text-white rounded-full hover:bg-white/50 transition transform hover:scale-110 shadow-lg"
+                >
                     <Maximize2 size={20} />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="p-3 bg-red-500/20 backdrop-blur-md text-white rounded-full hover:bg-red-50 transition transform hover:scale-110">
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+                    className="p-3 md:p-3 bg-red-500/40 backdrop-blur-md text-white rounded-full hover:bg-red-500/60 transition transform hover:scale-110 shadow-lg"
+                >
                     <Trash2 size={20} />
                 </button>
             </div>
 
-            <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-lg font-bold truncate opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm text-white text-[9px] md:text-[10px] px-2 py-1.5 font-bold truncate opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 {new Date(img.date).toLocaleDateString()} - {img.name}
             </div>
             
             {img.driveFileId && (
-                <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-md shadow-sm">
+                <div className="absolute top-2 left-2 bg-blue-600 text-white p-1 rounded-md shadow-sm z-10">
                     <Cloud size={10} />
                 </div>
             )}
@@ -62,9 +66,7 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
   
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
-  const [isDeviceActive, setIsDeviceActive] = useState(googleDriveService.hasActiveToken());
-  const [isReactivating, setIsReactivating] = useState(false);
-
+  
   // Viewer controls state
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -74,8 +76,8 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
   const viewerRef = useRef<HTMLDivElement>(null);
 
   const images = patient.images || [];
+  const unsyncedCount = images.filter(img => !img.driveFileId).length;
 
-  // التحميل الذكي للصورة داخل المعرض
   useEffect(() => {
     let objectUrl: string | null = null;
     if (!selectedImageData) {
@@ -85,23 +87,19 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
     }
 
     const loadHighRes = async () => {
-        // الخطوة 1: عرض رابط المعاينة فوراً (مضمون العمل)
         setViewerUrl(selectedImageData.url);
         
         if (!selectedImageData.driveFileId || !googleDriveService.hasActiveToken()) {
             return;
         }
 
-        // الخطوة 2: محاولة ترقية الجودة للنسخة الأصلية عبر الدرايف
         setIsViewerLoading(true);
         try {
             const url = await googleDriveService.getFileBlobUrl(selectedImageData.driveFileId);
             objectUrl = url;
-            // لا يتم التبديل إلا إذا نجحت العملية تماماً
             setViewerUrl(url);
         } catch (err) {
             console.warn("Failed to upgrade to HD, staying on preview URL.");
-            // في حال الفشل، الرابط البديل موجود بالفعل (viewerUrl = selectedImageData.url)
         } finally {
             setIsViewerLoading(false);
         }
@@ -116,29 +114,6 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
     };
   }, [selectedImageData]);
 
-  useEffect(() => {
-    const checkToken = () => setIsDeviceActive(googleDriveService.hasActiveToken());
-    checkToken();
-    window.addEventListener('dentro_drive_auth_change', checkToken);
-    const interval = setInterval(checkToken, 30000);
-    return () => {
-      window.removeEventListener('dentro_drive_auth_change', checkToken);
-      clearInterval(interval);
-    };
-  }, []);
-
-  const handleActivateDevice = async () => {
-      setIsReactivating(true);
-      try {
-          const token = await googleDriveService.login('consent');
-          if (token) setIsDeviceActive(true);
-      } catch (error) {
-          console.error("Reactivation failed:", error);
-      } finally {
-          setIsReactivating(false);
-      }
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -151,57 +126,27 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
     }
 
     setIsUploading(true);
-    const newUploadedImages: PatientImage[] = [];
+    const newImages: PatientImage[] = [];
     
     try {
-        if (googleDriveLinked && googleDriveRootId) {
-            if (!googleDriveService.isReady()) throw new Error("LIBRARY_NOT_READY");
-            setUploadProgress(t.syncing || "Connecting...");
-            
-            const hasToken = await googleDriveService.ensureToken();
-            if (!hasToken) {
-                const token = await googleDriveService.login('consent');
-                if (token) setIsDeviceActive(true);
-                else throw new Error("AUTH_FAILED");
-            }
-
-            const rootId = await googleDriveService.ensureRootFolder();
-            const patientFolderId = await googleDriveService.ensurePatientFolder(rootId, patient);
-            
-            for (let i = 0; i < fileList.length; i++) {
-                const file = fileList[i];
-                setUploadProgress(t.currentLang === 'ar' ? `جاري رفع ${i+1}/${fileList.length}` : `Uploading ${i+1}/${fileList.length}`);
-                const result = await googleDriveService.uploadFile(patientFolderId, file);
-                newUploadedImages.push({
+        const readFiles = fileList.map((file, i) => {
+            return new Promise<PatientImage>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve({
                     id: (Date.now() + i).toString(),
-                    url: result.url,
+                    url: reader.result as string,
                     name: file.name,
-                    date: new Date().toISOString(),
-                    driveFileId: result.id
+                    date: new Date().toISOString()
                 });
-            }
-            onUpdatePatient(patient.id, { images: [...newUploadedImages, ...images] });
-        } else {
-            const readFiles = fileList.map((file, i) => {
-                return new Promise<PatientImage>((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve({
-                        id: (Date.now() + i).toString(),
-                        url: reader.result as string,
-                        name: file.name,
-                        date: new Date().toISOString()
-                    });
-                    reader.readAsDataURL(file);
-                });
+                reader.readAsDataURL(file);
             });
-            const results = await Promise.all(readFiles);
-            onUpdatePatient(patient.id, { images: [...results, ...images] });
-        }
+        });
+        const results = await Promise.all(readFiles);
+        onUpdatePatient(patient.id, { images: [...results, ...images] });
     } catch (error: any) {
-        alert(error.message || t.errorDrive);
+        alert(error.message);
     } finally {
         setIsUploading(false);
-        setUploadProgress('');
         if (e.target) e.target.value = '';
     }
   };
@@ -236,7 +181,6 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
       }
   };
 
-  // Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
       if (zoom <= 1 && rotation === 0) return; 
       setIsDragging(true);
@@ -263,12 +207,6 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
                     <ImageIcon className="text-primary-500" />
                     {t.patientImages}
                 </h3>
-                {isUploading && (
-                    <div className="flex items-center gap-2 mt-1 px-3 py-1 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800 animate-pulse">
-                        <RefreshCw size={14} className="animate-spin text-primary-600" />
-                        <span className="text-xs text-primary-700 dark:text-primary-300 font-bold">{uploadProgress}</span>
-                    </div>
-                )}
             </div>
             
             <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -280,31 +218,28 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
             </div>
         </div>
 
+        {/* Unsynced Alert */}
+        {unsyncedCount > 0 && googleDriveLinked && (
+            <div className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30 p-4 rounded-2xl flex items-center justify-between gap-4 animate-fade-in">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 text-orange-600 rounded-xl">
+                        <AlertCircle size={20} />
+                    </div>
+                    <div>
+                        <p className="text-sm text-orange-800 dark:text-orange-300 font-bold">{t.unsyncedAlert}</p>
+                        <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">{t.goToSettingsToSync}</p>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="animate-fade-in">
-            {!googleDriveLinked ? (
+            {!googleDriveLinked && (
                 <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 p-4 rounded-2xl flex items-start gap-3">
                     <AlertTriangle className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" size={20} />
                     <p className="text-xs md:text-sm text-amber-800 dark:text-amber-300 font-bold leading-relaxed">{t.linkDriveInSettings}</p>
                 </div>
-            ) : !isDeviceActive ? (
-                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-pulse">
-                    <div className="flex items-center gap-3">
-                        <ShieldAlert size={22} className="text-blue-600 shrink-0" />
-                        <div>
-                            <p className="text-sm text-blue-700 dark:text-blue-300 font-bold">{t.deviceNeedsActivation}</p>
-                            <p className="text-xs text-blue-600/70 dark:text-blue-400/60 font-medium">{t.deviceActivationDesc}</p>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={handleActivateDevice}
-                        disabled={isReactivating}
-                        className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-blue-700 transition flex items-center justify-center gap-2"
-                    >
-                        {isReactivating ? <RefreshCw size={14} className="animate-spin" /> : <Key size={14} />}
-                        {t.activateDevice || "Activate Connection"}
-                    </button>
-                </div>
-            ) : null}
+            )}
         </div>
 
         {images.length === 0 ? (
@@ -326,40 +261,37 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
             </div>
         )}
 
-        {/* Full Screen Viewer - التحديث النهائي */}
+        {/* Responsive Viewer */}
         {selectedImageData && (
             <div 
                 ref={viewerRef}
                 className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-sm flex flex-col animate-fade-in select-none"
             >
                 {/* Header */}
-                <div className="flex justify-between items-center p-4 md:p-6 text-white shrink-0 border-b border-white/10 bg-black/40">
-                    <div className="flex flex-col">
-                        <span className="font-bold text-lg truncate max-w-[200px] md:max-w-md">{selectedImageData.name}</span>
-                        <span className="text-[10px] opacity-50 uppercase tracking-widest">{new Date(selectedImageData.date).toLocaleDateString()}</span>
+                <div className="flex justify-between items-center p-3 md:p-6 text-white shrink-0 border-b border-white/10 bg-black/40">
+                    <div className="flex flex-col overflow-hidden max-w-[60%]">
+                        <span className="font-bold text-sm md:text-lg truncate">{selectedImageData.name}</span>
+                        <span className="text-[9px] md:text-[10px] opacity-50 uppercase tracking-widest">{new Date(selectedImageData.date).toLocaleDateString()}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 md:gap-2">
                         {isViewerLoading && (
-                            <div className="flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full">
-                                <RefreshCw size={12} className="animate-spin text-primary-400" />
-                                <span className="text-[10px] font-bold uppercase tracking-tighter">HD Loading...</span>
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 md:px-3 md:py-1 bg-white/10 rounded-full shrink-0">
+                                <RefreshCw size={10} className="animate-spin text-primary-400" />
+                                <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-tighter">HD...</span>
                             </div>
                         )}
-                        <button 
-                            onClick={toggleFullscreen}
-                            className="p-3 hover:bg-white/10 rounded-full transition text-white/80"
-                        >
-                            <Maximize size={24} />
+                        <button onClick={toggleFullscreen} className="p-2 md:p-3 hover:bg-white/10 rounded-full transition text-white/80 hidden sm:block">
+                            <Maximize size={20} />
                         </button>
-                        <button onClick={resetViewer} className="p-2 hover:bg-white/10 rounded-full transition group">
-                            <X size={32} className="group-hover:rotate-90 transition-transform duration-300" />
+                        <button onClick={resetViewer} className="p-2 md:p-2 hover:bg-white/10 rounded-full transition group">
+                            <X size={28} className="md:w-8 md:h-8 group-hover:rotate-90 transition-transform duration-300" />
                         </button>
                     </div>
                 </div>
 
-                {/* Container مع معالجة Fallback في حال فشل الرابط */}
+                {/* Display Area */}
                 <div 
-                    className="flex-1 relative flex items-center justify-center overflow-hidden p-4 md:p-10 cursor-grab active:cursor-grabbing"
+                    className="flex-1 relative flex items-center justify-center overflow-hidden p-4 cursor-grab active:cursor-grabbing"
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -372,7 +304,6 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
                             alt="Full view" 
                             draggable={false}
                             onError={() => {
-                                // إذا فشل الرابط (خصوصاً رابط الـ Blob)، نعود فوراً للرابط العام
                                 if (viewerUrl !== selectedImageData.url) {
                                     setViewerUrl(selectedImageData.url);
                                 }
@@ -384,33 +315,32 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
                             className="max-w-full max-h-full object-contain shadow-2xl rounded-lg pointer-events-none" 
                         />
                     ) : (
-                        <div className="flex flex-col items-center gap-4 text-white/30">
-                            <RefreshCw size={48} className="animate-spin" />
-                        </div>
+                        <RefreshCw size={48} className="animate-spin text-white/20" />
                     )}
                 </div>
 
-                {/* Toolbar */}
-                <div className="p-6 md:p-8 shrink-0 flex justify-center border-t border-white/10 bg-black/60">
-                    <div className="flex items-center gap-3 md:gap-6 bg-white/10 backdrop-blur-xl p-2 md:p-3 rounded-3xl border border-white/20 shadow-2xl">
-                        <div className="flex items-center gap-1 border-e border-white/10 pe-3 md:pe-5">
-                            <button onClick={() => setZoom(prev => Math.max(0.25, prev - 0.25))} className="p-3 hover:bg-white/20 rounded-2xl transition text-white">
-                                <ZoomOut size={24} />
+                {/* Flexible Toolbar */}
+                <div className="p-4 md:p-8 shrink-0 flex justify-center border-t border-white/10 bg-black/60">
+                    <div className="flex flex-wrap justify-center items-center gap-2 md:gap-6 bg-white/10 backdrop-blur-xl p-2 md:p-3 rounded-2xl md:rounded-3xl border border-white/20 shadow-2xl max-w-[95vw]">
+                        
+                        <div className="flex items-center gap-1 border-white/10 border-e pe-2 md:pe-5">
+                            <button onClick={() => setZoom(prev => Math.max(0.25, prev - 0.25))} className="p-2 md:p-3 hover:bg-white/20 rounded-xl transition text-white">
+                                <ZoomOut size={20} className="md:w-6 md:h-6" />
                             </button>
-                            <span className="text-white font-mono font-bold text-xs min-w-[50px] text-center bg-white/5 py-1 rounded-lg">
+                            <span className="text-white font-mono font-bold text-[10px] md:text-xs min-w-[40px] md:min-w-[50px] text-center bg-white/5 py-1 rounded-lg">
                                 {Math.round(zoom * 100)}%
                             </span>
-                            <button onClick={() => setZoom(prev => Math.min(8, prev + 0.25))} className="p-3 hover:bg-white/20 rounded-2xl transition text-white">
-                                <ZoomIn size={24} />
+                            <button onClick={() => setZoom(prev => Math.min(8, prev + 0.25))} className="p-2 md:p-3 hover:bg-white/20 rounded-xl transition text-white">
+                                <ZoomIn size={20} className="md:w-6 md:h-6" />
                             </button>
                         </div>
 
-                        <div className="flex items-center gap-2 border-e border-white/10 pe-3 md:pe-5">
-                            <button onClick={() => setRotation(prev => prev - 90)} className="p-3 hover:bg-white/20 rounded-2xl transition text-white">
-                                <RotateCcw size={24} />
+                        <div className="flex items-center gap-1 md:gap-2 border-white/10 border-e pe-2 md:pe-5">
+                            <button onClick={() => setRotation(prev => prev - 90)} className="p-2 md:p-3 hover:bg-white/20 rounded-xl transition text-white">
+                                <RotateCcw size={20} className="md:w-6 md:h-6" />
                             </button>
-                            <button onClick={() => setRotation(prev => prev + 90)} className="p-3 hover:bg-white/20 rounded-2xl transition text-white">
-                                <RotateCw size={24} />
+                            <button onClick={() => setRotation(prev => prev + 90)} className="p-2 md:p-3 hover:bg-white/20 rounded-xl transition text-white">
+                                <RotateCw size={20} className="md:w-6 md:h-6" />
                             </button>
                         </div>
 
@@ -418,14 +348,14 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
                             <a 
                                 href={viewerUrl || selectedImageData.url} 
                                 download={selectedImageData.name} 
-                                className="p-4 bg-primary-600 hover:bg-primary-500 text-white rounded-2xl shadow-lg transition flex items-center gap-2 font-bold"
+                                className="p-2.5 md:p-4 bg-primary-600 hover:bg-primary-500 text-white rounded-xl md:rounded-2xl shadow-lg transition flex items-center gap-2 font-bold text-xs md:text-sm"
                             >
-                                <DownloadCloud size={24} />
-                                <span className="hidden md:inline">{t.download || "Download"}</span>
+                                <DownloadCloud size={20} className="md:w-6 md:h-6" />
+                                <span className="hidden xs:inline">{t.download || "Download"}</span>
                             </a>
                             <button 
                                 onClick={() => { setZoom(1); setRotation(0); setPosition({ x: 0, y: 0 }); }} 
-                                className="p-3 hover:bg-white/20 rounded-2xl transition text-white/70 text-xs font-bold uppercase"
+                                className="p-2.5 md:p-3 hover:bg-white/20 rounded-xl transition text-white/70 text-[10px] md:text-xs font-bold uppercase"
                             >
                                 {t.reset}
                             </button>

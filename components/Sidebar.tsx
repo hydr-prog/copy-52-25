@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={`flex items-center gap-2 w-full p-3 rounded-xl transition font-medium ${syncStatus === 'syncing' ? 'bg-blue-100 text-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'}`}
               >
                 <RefreshCw size={20} className={syncStatus === 'syncing' ? 'animate-spin' : ''} />
-                <span>{syncStatus === 'syncing' ? t.syncing : (syncStatus === 'offline' ? 'Offline' : 'Refresh Data')}</span>
+                <span>{syncStatus === 'syncing' ? t.syncing : (syncStatus === 'offline' ? t.offline : t.refreshData)}</span>
               </button>
           )}
           <button onClick={handleLogout} className="flex items-center gap-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 w-full p-3 rounded-xl transition font-medium">

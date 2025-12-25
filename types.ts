@@ -183,7 +183,10 @@ export interface Patient {
   treatmentSessions: TreatmentSession[];
   prescriptions: Prescription[];
   images?: PatientImage[]; 
-  rctDrawing?: string; // New: Stores base64 drawing
+  rctDrawing?: string; // local base64
+  rctDrawingDriveId?: string; // cloud status
+  profilePicture?: string; // base64 local
+  profilePictureDriveId?: string; // drive ID
 }
 
 export interface TodoItem {
@@ -236,6 +239,14 @@ export interface TextStyleConfig {
   isItalic: boolean;
 }
 
+export interface DocumentSettings {
+    text: string;
+    fontSize: number;
+    align: 'left' | 'center' | 'right';
+    topMargin: number;
+    backgroundImage?: string;
+}
+
 export interface ClinicData {
   clinicName: string;
   doctors: Doctor[];
@@ -269,7 +280,10 @@ export interface ClinicData {
     rxTemplate?: {
         rxSymbol: TextStyleConfig;
         medications: TextStyleConfig;
+        topMargin?: number;
     };
+    consentSettings?: DocumentSettings;
+    instructionSettings?: DocumentSettings;
   };
   lastUpdated: number;
   lastSynced?: string;
@@ -288,7 +302,9 @@ export const INITIAL_DATA: ClinicData = {
   medications: [
     { id: '1', name: 'Amoxicillin', dose: '500mg', frequency: '3 times daily', form: 'cap' },
     { id: '2', name: 'Ibuprofen', dose: '400mg', frequency: 'When needed', form: 'tab', notes: 'After food' },
+    // Fix: changed 'font' to 'form' to comply with Medication interface
     { id: '3', name: 'Paracetamol', dose: '500mg', frequency: 'Every 6 hours', form: 'tab' },
+    // Fix: changed 'font' to 'form' to comply with Medication interface
     { id: '4', name: 'Metronidazole', dose: '500mg', frequency: '3 times daily', form: 'tab' },
     { id: '5', name: 'Augmentin', dose: '625mg', frequency: '2 times daily', form: 'tab' },
   ],
@@ -312,14 +328,35 @@ export const INITIAL_DATA: ClinicData = {
     googleDriveLinked: false,
     rxTemplate: {
         rxSymbol: { fontSize: 30, color: '#000000', isBold: true, isItalic: true },
-        medications: { fontSize: 14, color: '#000000', isBold: true, isItalic: false }
-    }
+        medications: { fontSize: 14, color: '#000000', isBold: true, isItalic: false },
+        topMargin: 100
+    },
+    consentSettings: { text: '', fontSize: 12, align: 'right', topMargin: 130 },
+    instructionSettings: { text: '', fontSize: 12, align: 'right', topMargin: 130 }
   },
   lastUpdated: 0 
 };
 
 export const LABELS = {
   en: {
+    refreshData: "Refresh Data",
+    offline: "Offline",
+    gridView: "Grid",
+    listView: "List",
+    rctLocalSaveWarning: "Saved locally only. Please go to Settings to sync and save changes to the cloud.",
+    addTemplate: "Add Template",
+    editTemplate: "Edit Template",
+    deleteTemplate: "Delete Template",
+    applyTemplate: "Apply Template",
+    editText: "Edit Text",
+    docSettings: "Document Settings",
+    headerSpacing: "Header Spacing",
+    topMargin: "Top Distance (points)",
+    syncLocalFiles: "Sync Local Files",
+    unsyncedAlert: "There are local images not saved to cloud yet.",
+    goToSettingsToSync: "Go to Settings to sync your files.",
+    allSynced: "All files are synchronized.",
+    syncingNow: "Syncing files to Drive...",
     shapes: "Shapes",
     rectangle: "Rectangle",
     square: "Square",
@@ -811,6 +848,24 @@ export const LABELS = {
     textDir: "Direction",
   },
   ar: {
+    refreshData: "تحديث البيانات",
+    offline: "غير متصل",
+    gridView: "شبكة",
+    listView: "قائمة",
+    rctLocalSaveWarning: "تم الحفظ محلياً فقط. يرجى الذهاب للإعدادات لمزامنة وحفظ التعديلات على السحابة.",
+    addTemplate: "إضافة قالب",
+    editTemplate: "تعديل قالب",
+    deleteTemplate: "حذف قالب",
+    applyTemplate: "تطبيق القالب",
+    editText: "تعديل النص",
+    docSettings: "إعدادات المطبوع",
+    headerSpacing: "مسافة الترويسة",
+    topMargin: "المسافة من الأعلى (نقاط)",
+    syncLocalFiles: "مزامنة الملفات المحلية",
+    unsyncedAlert: "توجد صور ورسومات لم يتم حفظها سحابياً بعد.",
+    goToSettingsToSync: "يرجى الذهاب للإعدادات لمزامنة ملفاتك.",
+    allSynced: "جميع الملفات تمت مزامنتها بنجاح.",
+    syncingNow: "جاري مزامنة الملفات إلى درايف...",
     shapes: "الأشكال",
     rectangle: "مستطيل",
     square: "مربع",
@@ -862,13 +917,13 @@ export const LABELS = {
     oldPassword: "كلمة المرور القديمة",
     newPassword: "كلمة المرور الجديدة",
     confirmNewPassword: "تأكيد كلمة المرور الجديدة",
-    passwordsMismatch: "كلمات المرور غير متطابقة",
+    passwordsMismatch: "الكلمات المرور غير متطابقة",
     wrongOldPassword: "كلمة المرور القديمة غير صحيحة",
     clinicIdentity: "هوية العيادة",
     security: "الأمان والحماية",
     saveChanges: "حفظ التغييرات",
     changePassword: "تغيير كلمة المرور",
-    rxSettings: "إعدادات الوصفة",
+    rxSettings: "إعادة إعدادات الوصفة",
     rxSymbolStyle: "تنسيق كلمة RX",
     medsTextStyle: "تنسيق كتابة الأدوية",
     generalRxSettings: "إعدادات عامة",
@@ -912,7 +967,7 @@ export const LABELS = {
     adminAccessOnly: "صلاحيات الأدمن فقط",
     addProfilesHint: "يمكنك إضافة حسابات لكل طبيب أو للسكرتير من داخل الإعدادات في الحساب الأساسي.",
     changeAdminPass: "تغيير كلمة مرور المسؤول",
-    adminPassword: "كلمة مرور المسؤول",
+    adminPassword: "Admin Password",
     dashboard: "الإحصائيات",
     patients: "المرضى",
     memos: "المذكرات",
@@ -937,7 +992,7 @@ export const LABELS = {
     searchPatients: "بحث عن مريض...",
     active: "مستمر بالعلاج",
     finished: "منتهي",
-    pending: "لم بدأ",
+    pending: "لم يبدأ",
     discontinued: "لم يستمر",
     newPatient: "مريض جديد",
     name: "الاسم الكامل",
@@ -948,7 +1003,7 @@ export const LABELS = {
     female: "أنثى",
     notes: "الملاحظات",
     medicalHistory: "التاريخ الطبي",
-    save: "حفظ البيانات",
+    save: "حفظ",
     cancel: "إلغاء",
     payments: "الدفعات",
     appointments: "المواعيد",
@@ -983,7 +1038,7 @@ export const LABELS = {
     files: "الملفات",
     treatment: "العلاج",
     visitHistory: "الزيارات",
-    financials: "الحسابات",
+    financials: "المالية",
     backToPatients: "العودة للقائمة",
     selectCountry: "اختر الدولة",
     editPatient: "تعديل المعلومات",
@@ -1066,7 +1121,7 @@ export const LABELS = {
     transactionHistory: "سجل الدفعات",
     receipt: "وصل قبض",
     printChromeWarning: "يجب ان تكون عملية الطباعة من خلال متصفح Chrome على الكمبيوتر لتتم عملية الطباعة بصورة صحيحة.",
-    expenses: "الخسائر",
+    expenses: "الصرفيات",
     manageExpenses: "تتبع نفقات العيادة اليومية",
     addExpense: "إضافة صرفيات",
     editExpense: "تعديل السجل",
@@ -1117,7 +1172,7 @@ export const LABELS = {
     done: "تم",
     preferences: "التفضيلات",
     bgImageSet: "تم تعيين الخلفية.",
-    recSize: "الحجم الموصى به: A5. الصيغ المدعومة: JPG, PNG.",
+    recSize: "الحجم الموصى به: A5. الصيغة المدعومة: JPG, PNG.",
     data: "البيانات",
     cloudSync: "المزامنة السحابية",
     fullNamePlaceholder: "الاسم الكامل",
@@ -1156,7 +1211,7 @@ export const LABELS = {
     todoList: "قائمة مهام",
     addTodo: "إضافة مهمة",
     items: "المهام",
-    materials: "المواد",
+    materials: "Materials",
     totalPurchases: "مجموع المشتريات",
     convertToExpense: "تحويل إلى صرفيات",
     confirmConvert: "تحويل هذا العنصر إلى الصرفيات؟",
@@ -1235,7 +1290,7 @@ export const LABELS = {
     totalLabOrders: "طلبات فعالة",
     readyLabOrders: "جاهز للاستلام",
     totalLabCost: "تكاليف المختبر",
-    locked: "locked",
+    locked: "Locked",
     unlockToView: "أدخل الرمز لعرض الإحصائيات",
     thisWeek: "هذا الأسبوع",
     last30Days: "آخر 30 يوم",
@@ -1282,7 +1337,7 @@ export const LABELS = {
     featureProDesignsDesc: "تصاميم قابلة للتخصص واحترافية للوصفات الطبية والتقارير.",
     featureBackup: "نسخ احتياطي واستعادة",
     featureBackupDesc: "احتفظ بملف نسخة احتياطية آمنة لكل بيانات عيادتك واستعدها في أي وقت تحتاجه.",
-    featureThemes: "ثيمات متعددة",
+    featureThemes: "ثيمات متنوعة",
     featureThemesDesc: "تغيير ألوان واجهة التطبيق لتناسب ذوقك مع ثيمات متنوعة.",
     featureMainAccount: "حساب العيادة الأساسي",
     featureMainAccountDesc: "تحكم كامل في معلومات العيادة، الأطباء، وصلاحيات إدارية شاملة.",
@@ -1302,6 +1357,24 @@ export const LABELS = {
     textDir: "اتجاة النص",
   },
   ku: {
+    refreshData: "نوێکردنەوەی داتا",
+    offline: "هێڵ نییە",
+    gridView: "تۆڕ",
+    listView: "لیست",
+    rctLocalSaveWarning: "بە شێوەیەکی ناوخۆیی پاشەکەوت کرا. تکایە بڕۆ بۆ ڕێکخستنەکان بۆ هاوکاتکردن و پاشەکەوتکردنی گۆڕانکارییەکان لەسەر هەور.",
+    addTemplate: "قاڵب زیادبکە",
+    editTemplate: "قاڵب دەستکاری بکە",
+    deleteTemplate: "قاڵب بسڕەوە",
+    applyTemplate: "جێبەجێکردنی قاڵب",
+    editText: "دەستکاری دەق",
+    docSettings: "ڕێکخستنی چاپکراو",
+    headerSpacing: "بۆشایی سەرەوە",
+    topMargin: "بۆشایی لە سەرەوە (خاڵ)",
+    syncLocalFiles: "هاوکاتکردنی فایلە ناوخۆییەکان",
+    unsyncedAlert: "هەندێک وێنە و هێڵکاری هەن کە هێشتا لەسەر هەور پاشەکەوت nەکراون.",
+    goToSettingsToSync: "تکایە بڕۆ بۆ ڕێکخستنەکان بۆ هاوکاتکردنی فایلەکانت.",
+    allSynced: "هەموو فایلەکان بە سەرکەوتوویی هاوکات کراون.",
+    syncingNow: "فایلەکان بۆ درایڤ هاوکات دەکرێن...",
     shapes: "الأشكال",
     rectangle: "مستطيل",
     square: "مربع",
@@ -1312,11 +1385,11 @@ export const LABELS = {
     curvedArrow: "سهم منحني",
     rctTool: "مخطط المقطع العرضي للسن",
     rctToolDesc: "نەخشەی بڕگەی تەنیشتی ددان. گۆڕانکارییەکان لە فایلی نەخۆشەکە پاشەکەوت دەبن.",
-    saveToDrive: "پاشەکەوتکردن لە Google Drive",
+    saveToDrive: "...پاشەکەوتکردن لە Google Drive",
     saveSuccessLocal: "بە سەرکەوتوویی لە فایلی نەخۆشەکە پاشەکەوت کرا.",
     saveSuccessDrive: "بە سەرکەوتوویی لەگەڵ Google Drive هاوکات کرا.",
     brush: "فڵچە",
-    size: "قەبارە",
+    size: "خاڵ",
     color: "ڕەنگ",
     clear: "سڕینەوەی هەموو",
     undo: "گەڕانەوە",
@@ -1328,7 +1401,7 @@ export const LABELS = {
     resetLocalDataDesc: "ئەمە دەبێتە هۆی سڕینەوەی هەموو داتا و فایلە کاتییەکان لەسەر ئەم ئامێرە. ئەمە بەکاربێنە ئەگەر کێشەی هاوکاتکردنت هەبوو. هیچ داتایەک لە سحابة ناسڕێتەوە.",
     resetConfirmTitle: "داتاکانی ئەم ئامێرە دەسڕیتەوە؟",
     resetConfirmMsg: "لە هەژمارەکەت دەچیتە دەرەوە و فایلە ناوخۆییەکان دەسڕدرێنەوە. داتاکانت پارێزراون و دووبارە دادەگیرێنەوە کاتێک دەچیتەوە ژوورەوە.",
-    deviceNeedsActivation: "ئامێرەکە پێویستی بە چالاککردن هەیە",
+    deviceNeedsActivation: " ئامێرەکە پێویستی بە چالاککردن هەیە",
     deviceActivationDesc: "تکایە ئەم ئامێرە لە بەشی ڕێکخستنەکان چالاک بکە بۆ ئەوەی ڕێگەت پێبدرێت فایلەکان بەرز بکەیتەوە.",
     activateDevice: "چالاککردنی ئامێر",
     deviceActiveReady: "ئامێرەکە چالاکە و ئامادەیە",
@@ -1388,7 +1461,7 @@ export const LABELS = {
     addSecretary: "زیادکردنی سکرتێر",
     editSecretary: "دەستکاری سکرتێر",
     secretaryName: "ناوی سکرتێر",
-    maxSecretaries: "تەنها ٤ سکرتێر ڕێگەپێدراوە",
+    maxSecretary: "تەنها ٤ سکرتێر ڕێگەپێدراوە",
     enterSecretaryPass: "وشەی تێپەڕی سکرتێر بنووسە",
     enterAdminPass: "وشەی تێپەڕی هەژماری سەرەکی بنووسە",
     enterDocPass: "وشەی تێپەڕی پزیشک بنووسە",
@@ -1412,7 +1485,7 @@ export const LABELS = {
     settings: "ڕێکخستنەکان",
     purchases: "کڕینەکان",
     inventory: "کۆگا",
-    manageInventory: "چاودێری کۆگا و ماددەکان",
+    manageInventory: "تتبع المواد ومستويات المخزون",
     addInventoryItem: "زیادکردنی ماددە",
     editInventoryItem: "دەستکاری ماددە",
     currentQty: "بڕی ئێستا",
@@ -1680,8 +1753,8 @@ export const LABELS = {
     alignCenter: "ناوەڕاست",
     alignLeft: "چەپ",
     fontSize: "قەبارەی نووسین",
-    saveTemplate: "هەڵگرتن وەک قاڵب",
-    loadTemplate: "هێنانی قاڵب",
+    saveTemplate: "قاڵب هەڵگرە",
+    loadTemplate: "قاڵب باربکە",
     templateName: "ناوی قاڵب",
     selectTemplate: "قاڵبێک دیاریبکە...",
     generalChart: "هێڵکاری گشتی",
@@ -1726,7 +1799,7 @@ export const LABELS = {
     totalLabOrders: "داواکاری چالاک",
     readyLabOrders: "ئامادە بۆ وەرگرتن",
     totalLabCost: "تێچووی تاقیگە",
-    locked: "locked",
+    locked: "Locked",
     unlockToView: "کۆد بنووسە بۆ بینینی ئامارەکان",
     thisWeek: "ئەم هەفتەیە",
     last30Days: "٣٠ ڕۆژی ڕابردوو",
@@ -1752,7 +1825,7 @@ export const LABELS = {
     featureLabOrders: "بەڕێوەبردنی تاقیگە",
     featureLabOrdersDesc: "چاودێری دۆخی داواکارییەکانی تاقیگە, تێچوون و ڕەنگەکان بۆ دڵنیابوون لە گەیشتن.",
     featureDocs: "بەڵگەنامە پڕۆفیشناڵەکان",
-    featureDocsDesc: "چاپکردنی ڕەچەتە، پسوڵە، و فۆرمی ڕەزامەندی بە دیزاینی تایبەتی خۆت.",
+    featureDocsDesc: "چاپکردنی ڕەچەتە، پسوڵە، و فۆرمی ڕەزامەندی بە دیزاینی تایبەتمەندی خۆت.",
     featureDashboard: "تەختەی کۆنترۆڵ",
     featureDashboardDesc: "ئاماری راستەوخۆ لەسەر داهات و گەشەی نەخۆش و ئاستی کلینیک.",
     featureCloud: "هاوکاتکردنی هەوری",
@@ -1777,8 +1850,8 @@ export const LABELS = {
     featureThemesDesc: "ڕەنگی ڕووکاری بەرنامەکە بگۆڕە بۆ ئەوەی لەگەڵ ئارەزووی خۆت بگونجێت.",
     featureMainAccount: "هەژماری سەرەکی کلینیک",
     featureMainAccountDesc: "کۆنترۆڵ تەواو بەسەر زانیارییەکانی کلینیک، پزیشکەکان و دەسەڵاتە کارگێڕییەکان.",
-    featureDoctorProfile: "پرۆفايلي پزیشکی جیاواز",
-    featureDoctorProfileDesc: "پرۆفایلی تاکەکەسی بۆ هەر پزیشکێک کە تەنها نەخۆشەکان و وردەکاری و ئامارەکانی خۆی تێدایە.",
+    featureDoctorProfile: "پرۆفایلي پزیشکی جیاواز",
+    featureDoctorProfileDesc: "پرۆفایلی تاکەکەسی بۆ هەر پزیشکێک کە تەنها نەخۆشەکان و وردەکاري و ئامارەکانی خۆی تێدایە.",
     featureSecretaryAccount: "هەژماری سکرتێر",
     featureSecretaryAccountDesc: "هەژمارێکی تایبدت بۆ کارەکانی پێشوازی بە دەستڕاگەیشتنێکی سنووردار بە داتا داراییەکان.",
     bestValue: "باشترین نرخ",

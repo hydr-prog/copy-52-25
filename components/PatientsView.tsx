@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, MessageCircle, Phone, ArrowUpDown, ChevronLeft, ChevronRight, CalendarPlus } from 'lucide-react';
+import { Plus, Search, Filter, MessageCircle, Phone, ArrowUpDown, ChevronLeft, ChevronRight, CalendarPlus, LayoutGrid, List } from 'lucide-react';
 import { CATEGORIES, STATUS_COLORS } from '../constants';
 import { getLocalizedDate } from '../utils';
-import { ClinicData } from '../types';
+import { ClinicData, Patient } from '../types';
 
 interface PatientsViewProps {
   t: any;
@@ -18,7 +18,7 @@ interface PatientsViewProps {
   setSelectedCategory: (cat: string) => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
-  onAddAppointment?: (patientId: string) => void; // إضافة Prop جديد
+  onAddAppointment?: (patientId: string) => void;
 }
 
 const ITEMS_PER_PAGE = 100;
@@ -29,6 +29,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
 }) => {
   const [showFilter, setShowFilter] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'newest' | 'oldest'>('newest');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(() => (localStorage.getItem('dentro_patients_view') as 'list' | 'grid') || 'list');
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -40,6 +41,10 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
   const [filterAge, setFilterAge] = useState<string>('');
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
+
+  useEffect(() => {
+      localStorage.setItem('dentro_patients_view', viewMode);
+  }, [viewMode]);
 
   // Reset to first page when any filter changes
   useEffect(() => {
@@ -56,7 +61,6 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
     setShowFilter(false);
   };
 
-  // 1. First, Filter ALL data
   const filteredPatients = data.patients.filter(p => {
     const matchCategory = selectedCategory === 'all' || p.category === selectedCategory;
     const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -92,12 +96,46 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
       }
   });
 
-  // 2. Then, Pagination Logic (Slice the filtered data)
   const totalPages = Math.ceil(filteredPatients.length / ITEMS_PER_PAGE);
   const displayedPatients = filteredPatients.slice(
       (currentPage - 1) * ITEMS_PER_PAGE,
       currentPage * ITEMS_PER_PAGE
   );
+
+  const PatientCardActions = ({ patient }: { patient: Patient }) => (
+    <div className="flex items-center gap-2">
+        <button 
+            onClick={(e) => { e.stopPropagation(); onAddAppointment?.(patient.id); }}
+            className="p-2.5 bg-primary-50 text-primary-600 hover:bg-primary-600 hover:text-white rounded-xl transition shadow-sm"
+            title={t.addAppointment}
+        >
+            <CalendarPlus size={18} />
+        </button>
+        <a 
+            href={`https://wa.me/${patient.phoneCode?.replace('+','')}${patient.phone.replace(/\s/g, '')}`}
+            target="_blank" 
+            rel="noreferrer"
+            className="p-2.5 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition shadow-sm"
+            title={t.contactWhatsapp}
+            onClick={(e) => e.stopPropagation()}
+        >
+            <MessageCircle size={18} />
+        </a>
+        <a 
+            href={`tel:${patient.phoneCode?.replace('+','')}${patient.phone.replace(/\s/g, '')}`}
+            className="p-2.5 bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-xl transition shadow-sm"
+            onClick={(e) => e.stopPropagation()}
+        >
+            <Phone size={18} />
+        </a>
+    </div>
+  );
+
+  const getCategoryLabel = (patient: Patient) => {
+      if (!patient.category) return 'Other';
+      const cat = CATEGORIES.find(c => c.id === patient.category);
+      return isRTL ? (currentLang === 'ku' ? cat?.labelKu : cat?.labelAr) : cat?.label || patient.category;
+  };
 
   return (
     <div className="flex flex-col w-full pb-10">
@@ -109,13 +147,34 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
                {filteredPatients.length > ITEMS_PER_PAGE && ` (${t.page || 'Page'} ${currentPage} / ${totalPages})`}
            </p>
          </div>
-         <button 
-          onClick={() => setShowNewPatientModal(true)}
-          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-xl shadow-lg shadow-primary-500/30 transition transform hover:-translate-y-0.5 active:translate-y-0"
-        >
-          <Plus size={20} />
-          <span>{t.newPatient}</span>
-        </button>
+         
+         <div className="flex items-center gap-3 w-full sm:w-auto">
+             {/* View Mode Toggle */}
+             <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl shadow-inner">
+                <button 
+                    onClick={() => setViewMode('list')} 
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                    title={t.listView}
+                >
+                    <List size={20} />
+                </button>
+                <button 
+                    onClick={() => setViewMode('grid')} 
+                    className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-400 hover:text-gray-600'}`}
+                    title={t.gridView}
+                >
+                    <LayoutGrid size={20} />
+                </button>
+             </div>
+
+             <button 
+              onClick={() => setShowNewPatientModal(true)}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-xl shadow-lg shadow-primary-500/30 transition transform hover:-translate-y-0.5 active:translate-y-0 font-bold"
+            >
+              <Plus size={20} />
+              <span>{t.newPatient}</span>
+            </button>
+         </div>
       </div>
 
       <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-4 no-scrollbar">
@@ -142,11 +201,10 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
              value={searchQuery}
              onChange={(e) => setSearchQuery(e.target.value)}
              placeholder={t.searchPatients}
-             className="w-full ps-12 pe-4 py-4 rounded-xl border-none shadow-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:ring-2 focus:ring-primary-500 transition"
+             className="w-full ps-12 pe-4 py-4 rounded-xl border-none shadow-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:ring-2 focus:ring-primary-500 transition font-medium"
            />
         </div>
         
-        {/* Sort Dropdown */}
         <div className="relative">
              <div className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-500 pointer-events-none">
                  <ArrowUpDown size={18} />
@@ -222,77 +280,101 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
           </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        {filteredPatients.length === 0 ? (
-            <div className="text-center py-10 text-gray-400 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-                {searchQuery || showFilter ? t.noPatientsFilter : t.noPatientsCategory}
-            </div>
-        ) : (
-            displayedPatients.map(patient => (
-            <div key={patient.id} className="group bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-primary-200 dark:hover:border-primary-900 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
-                
+      {/* Patients Display Area */}
+      {filteredPatients.length === 0 ? (
+          <div className="text-center py-20 text-gray-400 bg-white dark:bg-gray-800 rounded-3xl border-2 border-dashed border-gray-200 dark:border-gray-700 animate-fade-in">
+              {searchQuery || showFilter ? t.noPatientsFilter : t.noPatientsCategory}
+          </div>
+      ) : (
+          viewMode === 'list' ? (
+              <div className="flex flex-col gap-3">
+                {displayedPatients.map(patient => (
                 <div 
-                className="flex items-center gap-4 cursor-pointer flex-1"
-                onClick={() => { setSelectedPatientId(patient.id); setPatientTab('overview'); setCurrentView('patients'); }}
+                    key={patient.id} 
+                    className="group bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-primary-200 dark:hover:border-primary-900 transition-all duration-300 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in"
+                    onClick={() => { setSelectedPatientId(patient.id); setPatientTab('overview'); setCurrentView('patients'); }}
                 >
-                <div className="relative">
-                    <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xl overflow-hidden shrink-0 border-2 border-white dark:border-gray-600 shadow-sm">
-                        <span>{patient.gender === 'male' ? '👨' : '👩'}</span>
+                    <div className="flex items-center gap-4 cursor-pointer flex-1">
+                        <div className="relative">
+                            <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl overflow-hidden shrink-0 border-2 border-white dark:border-gray-600 shadow-sm ${STATUS_COLORS[patient.status].split(' ')[0]}`}>
+                                {patient.profilePicture ? (
+                                    <img src={patient.profilePicture} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span>{patient.gender === 'male' ? '👨' : '👩'}</span>
+                                )}
+                            </div>
+                            <div className={`absolute bottom-0 end-0 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-gray-800 ${STATUS_COLORS[patient.status].split(' ')[0].replace('bg-', 'bg-')}`} />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg text-gray-800 dark:text-white group-hover:text-primary-600 transition-colors">{patient.name}</h3>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                                <span dir="ltr" className="font-medium">{patient.phoneCode} {patient.phone}</span>
+                                <span className="hidden sm:inline opacity-30">•</span>
+                                <span className="uppercase text-[10px] font-black tracking-tighter bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md leading-none">{t[patient.status] || patient.status}</span>
+                                <span className="hidden sm:inline opacity-30">•</span>
+                                <span className="text-[10px] font-black uppercase tracking-tighter text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-2 py-0.5 rounded-md leading-none">
+                                    {getCategoryLabel(patient)}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div className={`absolute bottom-0 end-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-800 ${STATUS_COLORS[patient.status].split(' ')[0].replace('bg-', 'bg-')}`} />
-                </div>
-                <div>
-                    <h3 className="font-bold text-lg text-gray-800 dark:text-white group-hover:text-primary-600 transition">{patient.name}</h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                    <span dir="ltr">{patient.phoneCode} {patient.phone}</span>
-                    <span>•</span>
-                    <span className="uppercase text-xs font-bold bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">{t[patient.status] || patient.status}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span className="hidden sm:inline text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">
-                        {patient.category ? (CATEGORIES.find(c => c.id === patient.category)?.[isRTL ? (currentLang === 'ku' ? 'labelKu' : 'labelAr') : 'label'] || patient.category) : 'Other'}
-                    </span>
-                     <span className="hidden sm:inline">•</span>
-                     <span className="hidden sm:inline text-xs opacity-70">
-                        {getLocalizedDate(new Date(patient.createdAt), 'full', currentLang)}
-                     </span>
+                    <div className="self-end sm:self-center">
+                        <PatientCardActions patient={patient} />
                     </div>
                 </div>
-                </div>
+                ))}
+              </div>
+          ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in">
+                  {displayedPatients.map(patient => (
+                      <div 
+                        key={patient.id} 
+                        onClick={() => { setSelectedPatientId(patient.id); setPatientTab('overview'); setCurrentView('patients'); }}
+                        className="group bg-white dark:bg-gray-800 p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-2xl hover:-translate-y-1 hover:border-primary-100 dark:hover:border-primary-900 transition-all duration-300 relative overflow-hidden flex flex-col items-center text-center"
+                      >
+                          {/* Top Status Badge */}
+                          <div className={`absolute top-0 right-0 px-4 py-1.5 rounded-bl-2xl text-[10px] font-black uppercase tracking-widest ${STATUS_COLORS[patient.status]}`}>
+                              {t[patient.status] || patient.status}
+                          </div>
 
-                <div className="flex items-center gap-3 self-end sm:self-center">
-                    {/* زر حجز الموعد الجديد */}
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onAddAppointment?.(patient.id); }}
-                        className="p-3 bg-primary-100 text-primary-600 hover:bg-primary-600 hover:text-white rounded-xl transition shadow-sm"
-                        title={t.addAppointment}
-                    >
-                        <CalendarPlus size={20} />
-                    </button>
+                          <div className="mb-5 relative">
+                                <div className={`w-24 h-24 rounded-full flex items-center justify-center text-4xl overflow-hidden border-4 border-white dark:border-gray-700 shadow-xl transition-transform duration-500 group-hover:scale-110 ${STATUS_COLORS[patient.status].split(' ')[0]}`}>
+                                    {patient.profilePicture ? (
+                                        <img src={patient.profilePicture} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span>{patient.gender === 'male' ? '👨' : '👩'}</span>
+                                    )}
+                                </div>
+                                <div className="absolute -bottom-1 -right-1 bg-white dark:bg-gray-700 p-2 rounded-full shadow-md text-primary-600 dark:text-primary-400 opacity-0 group-hover:opacity-100 transition-all duration-300">
+                                    <ArrowUpDown size={14} className="rotate-90" />
+                                </div>
+                          </div>
 
-                    <a 
-                        href={`https://wa.me/${patient.phoneCode?.replace('+','')}${patient.phone.replace(/\s/g, '')}`}
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="p-3 bg-green-100 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition shadow-sm"
-                        title={t.contactWhatsapp}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <MessageCircle size={20} />
-                    </a>
-                    
-                    <a 
-                        href={`tel:${patient.phoneCode?.replace('+','')}${patient.phone.replace(/\s/g, '')}`}
-                        className="p-3 bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-xl transition shadow-sm"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <Phone size={20} />
-                    </a>
-                </div>
+                          <h3 className="font-black text-xl text-gray-800 dark:text-white mb-2 leading-tight group-hover:text-primary-600 transition-colors">{patient.name}</h3>
+                          
+                          <div dir="ltr" className="text-gray-500 dark:text-gray-400 font-mono font-bold text-sm mb-4">
+                              {patient.phoneCode} {patient.phone}
+                          </div>
 
-            </div>
-            ))
-        )}
-      </div>
+                          <div className="mt-auto w-full space-y-4">
+                              <div className="flex justify-center gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-tighter text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-3 py-1 rounded-full">
+                                      {getCategoryLabel(patient)}
+                                  </span>
+                                  <span className="text-[10px] font-black uppercase tracking-tighter text-gray-500 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
+                                      {patient.age} {t.age}
+                                  </span>
+                              </div>
+
+                              <div className="pt-4 border-t border-gray-50 dark:border-gray-700/50 flex justify-center">
+                                  <PatientCardActions patient={patient} />
+                              </div>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          )
+      )}
 
       {/* Pagination Controls */}
       {filteredPatients.length > ITEMS_PER_PAGE && (

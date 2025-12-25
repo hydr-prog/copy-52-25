@@ -178,33 +178,35 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                       <div 
                           key={idx} 
                           onClick={() => { setCurrentDate(day); setCalendarView('day'); }}
-                          className={`p-4 rounded-3xl border-2 shadow-sm cursor-pointer hover:shadow-md transition min-h-[160px] flex flex-col ${colorClass} ${idx === 6 ? 'md:col-span-2' : ''}`}
+                          className={`p-5 rounded-[2.5rem] border-2 shadow-sm cursor-pointer hover:shadow-md transition min-h-[180px] flex flex-col ${colorClass} ${idx === 6 ? 'md:col-span-2' : ''}`}
                       >
-                          <div className="flex justify-between items-center mb-3 border-b border-black/10 pb-2">
+                          <div className="flex justify-between items-start mb-4 border-b-2 border-current/40 pb-3">
                               <div>
-                                  <div className="text-lg font-bold opacity-90">{getLocalizedDate(day, 'weekday', currentLang)}</div>
-                                  <div className="text-sm opacity-70">{getLocalizedDate(day, 'full', currentLang)}</div>
+                                  <div className="text-xl font-black opacity-100 mb-0.5">{getLocalizedDate(day, 'weekday', currentLang)}</div>
+                                  <div className="text-xs opacity-80 font-bold">{getLocalizedDate(day, 'full', currentLang)}</div>
                               </div>
-                              {isToday && <span className="bg-white/50 px-2 py-1 rounded-lg text-xs font-bold shadow-sm">{t.today.toUpperCase()}</span>}
+                              {isToday && <span className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-[10px] font-black shadow-sm ring-1 ring-black/5">{t.today.toUpperCase()}</span>}
                           </div>
 
-                          <div className="flex-1 space-y-2">
+                          <div className="flex-1 space-y-2.5">
                               {dayAppointments.length === 0 ? (
-                                  <div className="flex-1 flex items-center justify-center opacity-40 text-sm font-medium italic">
+                                  <div className="flex-1 flex items-center justify-center opacity-40 text-sm font-black italic">
                                       {t.noAppsDay}
                                   </div>
                               ) : (
                                   dayAppointments.map(appt => (
-                                      <div key={appt.id} className="flex items-center justify-between bg-white/60 dark:bg-black/20 p-2 rounded-xl">
-                                          <span className="font-bold text-sm truncate max-w-[120px]">{appt.patientName}</span>
-                                          <span className="text-xs font-mono bg-white/50 dark:bg-black/20 px-1.5 py-0.5 rounded">{formatTime12(appt.time, currentLang)}</span>
+                                      <div key={appt.id} className="flex items-center justify-between bg-white/90 dark:bg-black/40 p-3 rounded-2xl shadow-sm border border-black/5 transition-transform hover:scale-[1.02]">
+                                          <span className="font-black text-sm text-gray-900 dark:text-white truncate flex-1 pr-2">{appt.patientName}</span>
+                                          <span className="text-[11px] font-black font-mono bg-primary-600 text-white dark:bg-primary-500 px-2 py-1 rounded-lg shrink-0 shadow-sm">
+                                              {formatTime12(appt.time, currentLang)}
+                                          </span>
                                       </div>
                                   ))
                               )}
                           </div>
                           
                           {dayAppointments.length > 0 && (
-                             <div className="mt-2 text-xs opacity-75 font-bold text-end">
+                             <div className="mt-3 text-[10px] opacity-90 font-black text-end uppercase tracking-widest bg-black/5 dark:bg-white/10 py-1 px-3 rounded-full w-fit ms-auto">
                                  {dayAppointments.length} {isRTL ? (currentLang === 'ku' ? 'دانیشتن' : 'جلسات') : 'Sessions'}
                              </div>
                           )}

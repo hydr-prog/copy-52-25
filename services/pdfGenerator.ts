@@ -1,4 +1,3 @@
-
 import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { ClinicData, Patient, Prescription, Payment, Appointment } from '../types';
@@ -131,6 +130,7 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
     // Load config from data or use defaults
     const rxConfig = data.settings.rxTemplate?.rxSymbol || { fontSize: 30, color: '#000000', isBold: true, isItalic: true };
     const medsConfig = data.settings.rxTemplate?.medications || { fontSize: 14, color: '#000000', isBold: true, isItalic: false };
+    const customTopMargin = data.settings.rxTemplate?.topMargin ?? 100;
 
     const page = pdfDoc.addPage([420, 595]); // A5 Size
     const { width, height } = page.getSize();
@@ -183,7 +183,8 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
         drawLine(page, margin, width - margin, y, 1, COLORS.line);
         y -= 25;
     } else {
-        y = height - 130; 
+        // If there's a background, we use the custom top margin to start the content
+        y = height - customTopMargin; 
     }
 
     // 3. Patient Info
@@ -309,15 +310,13 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     let y = pageHeight - 30;
 
     // --- Header ---
+    // Removed phone from header to avoid confusion with ID numbers as requested by user
     drawText(page, data.clinicName, centerX, y, fontBold, 16, 'center', COLORS.accent);
-    y -= 18;
-    if(data.settings.clinicPhone) {
-        drawText(page, data.settings.clinicPhone, centerX, y, fontRegular, 10, 'center', COLORS.secondary);
-        y -= 15;
-    }
-    // Change: Use payment date instead of current date
-    const paymentDateStr = format(new Date(payment.date), 'yyyy-MM-dd  HH:mm');
-    drawText(page, paymentDateStr, centerX, y, fontRegular, 9, 'center', COLORS.secondary);
+    y -= 25;
+
+    // Fix: Use CURRENT system time for printing to avoid the date-only "03:00" timezone bug
+    const printTimeStr = format(new Date(), 'yyyy-MM-dd  HH:mm');
+    drawText(page, printTimeStr, centerX, y, fontRegular, 9, 'center', COLORS.secondary);
     y -= 12;
     
     drawDashedLine(page, margin, pageWidth - margin, y);
@@ -346,7 +345,6 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     const label = payment.type === 'payment' ? t.paymentReceived : t.treatmentCost;
     const amountStr = `${payment.amount.toLocaleString()} ${data.settings.currency}`;
     
-    // Change: Centered and stacked
     drawText(page, label, centerX, y, fontRegular, 12, 'center', COLORS.primary);
     y -= 25;
     drawText(page, amountStr, centerX, y, fontBold, 20, 'center', COLORS.accent);
@@ -394,12 +392,11 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     // Remaining Balance (Prominent)
     drawSummaryRow(t.remaining, rem, true);
 
-    y -= 30;
+    y -= 40; // Increased spacing for footer
     
     // --- Footer ---
+    // Removed Clinic Phone completely as requested by the user ("I don't want any mention of it")
     drawText(page, t.thankYou, centerX, y, fontRegular, 10, 'center', COLORS.secondary);
-    y -= 12;
-    drawText(page, '*** Dentro Clinic App ***', centerX, y, fontRegular, 8, 'center', rgb(0.7, 0.7, 0.7));
 
     const pdfBytes = await pdfDoc.save();
     return new Blob([pdfBytes], { type: 'application/pdf' });
@@ -480,7 +477,7 @@ export const generateAppointmentPdf = async (data: ClinicData, appointment: Appo
     return new Blob([pdfBytes], { type: 'application/pdf' });
 };
 
-export const generateDocumentPdf = async (data: ClinicData, patient: Patient, doc: { type: 'consent' | 'instructions', text: string, align: any, fontSize: number }, t: any) => {
+export const generateDocumentPdf = async (data: ClinicData, patient: Patient, doc: { type: 'consent' | 'instructions', text: string, align: 'left'|'center'|'right', fontSize: number, topMargin: number }, t: any) => {
     const { fontBytes, fontBoldBytes } = await loadResources();
     const pdfDoc = await PDFDocument.create();
     pdfDoc.registerFontkit(fontkit);
@@ -491,7 +488,7 @@ export const generateDocumentPdf = async (data: ClinicData, patient: Patient, do
     const isA4 = doc.type === 'consent';
     const page = pdfDoc.addPage(isA4 ? [595, 842] : [420, 595]); 
     const { width, height } = page.getSize();
-    const margin = 30; // Closer to Rx margin
+    const margin = 30; 
 
     const bgImageStr = isA4 ? data.settings.consentBackgroundImage : data.settings.instructionsBackgroundImage;
     if (bgImageStr) {
@@ -528,17 +525,16 @@ export const generateDocumentPdf = async (data: ClinicData, patient: Patient, do
         drawLine(page, margin, width - margin, y, 1, COLORS.line);
         y -= 25;
     } else {
-        y = height - 130;
+        // If there's a background, we use the custom top margin to start the content
+        y = height - (doc.topMargin || 130);
     }
 
-    // 2. Patient Information (Exactly like Rx but larger font)
-    // PROTECTED LOCAL LANG: Use logic from calling environment
+    // 2. Patient Information
     const currentLang = data.settings.language || 'ar'; 
     const isRTL = currentLang === 'ar' || currentLang === 'ku';
     const labelColor = COLORS.accent;
     const valueColor = COLORS.primary;
     
-    // Separate Font Sizes for Consent vs Instructions
     const labelSize = doc.type === 'consent' ? 14 : 12;
     const valueSize = doc.type === 'consent' ? 14 : 12;
 
@@ -548,44 +544,33 @@ export const generateDocumentPdf = async (data: ClinicData, patient: Patient, do
     const dateStr = new Date().toLocaleDateString('en-GB');
 
     if (isRTL) {
-        // Name (Right)
         drawText(page, tName, width - margin, y, fontBold, labelSize, 'right', labelColor);
         drawText(page, patient.name, width - margin - 50, y, fontBold, valueSize, 'right', valueColor);
         
         if (doc.type === 'consent') {
-            // Age (Middle - Shifted further Left for better spacing)
             drawText(page, tAge, width - margin - 230, y, fontBold, labelSize, 'right', labelColor);
             drawText(page, `${patient.age}`, width - margin - 280, y, fontRegular, valueSize, 'right', valueColor);
         }
 
-        // Date (Left) - Adjusted gap to 110 as requested
         drawText(page, tDate, margin + 110, y, fontBold, labelSize, 'right', labelColor); 
         drawText(page, dateStr, margin, y, fontRegular, valueSize, 'left', valueColor);
     } else {
-        // Name (Left)
         drawText(page, tName, margin, y, fontBold, labelSize, 'left', labelColor);
         
         if (doc.type === 'consent') {
-            // Consent Form (A4) - Wider space, existing layout logic
             drawText(page, patient.name, margin + 50, y, fontBold, valueSize, 'left', valueColor);
-            
             drawText(page, tAge, margin + 250, y, fontBold, labelSize, 'left', labelColor);
             drawText(page, `${patient.age}`, margin + 290, y, fontRegular, valueSize, 'left', valueColor);
-
             drawText(page, tDate, width - margin - 120, y, fontBold, labelSize, 'left', labelColor);
             drawText(page, dateStr, width - margin, y, fontRegular, valueSize, 'right', valueColor);
         } else {
-            // Instructions (A5) - Narrower space, NO AGE
             drawText(page, patient.name, margin + 40, y, fontBold, valueSize, 'left', valueColor);
-
-            // Date (Right) - Allocated 100 space
             drawText(page, tDate, width - margin - 100, y, fontBold, labelSize, 'left', labelColor);
             drawText(page, dateStr, width - margin, y, fontRegular, valueSize, 'right', valueColor);
         }
     }
 
     y -= 15;
-    // Always draw separator line under patient info
     drawLine(page, margin, width - margin, y, 1, COLORS.primary);
     y -= 30;
 

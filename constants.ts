@@ -7,11 +7,11 @@ export const THEMES: Theme[] = [
   { id: 'nature', nameEn: 'Nature', nameAr: 'طبيعي', nameKu: 'سروشتی', type: 'light', colors: { primary: '#10B981', secondary: '#34D399', bg: '#ECFDF5' } },
   { id: 'bold-energy', nameEn: 'Bold Energy', nameAr: 'جريء', nameKu: 'وزەی بوێر', type: 'light', colors: { primary: '#EA580C', secondary: '#F97316', bg: '#FFF7ED' } },
   { id: 'luxury', nameEn: 'Luxury', nameAr: 'فاخر', nameKu: 'شاهانە', type: 'light', colors: { primary: '#EAB308', secondary: '#FACC15', bg: '#FAF5FF' } },
-  { id: 'soft-blue', nameEn: 'Soft Blue', nameAr: 'أزرق هادئ', nameKu: 'شیونی هێمن', type: 'light', colors: { primary: '#3B82F6', secondary: '#93C5FD', bg: '#EFF6FF' } },
+  { id: 'soft-blue', nameEn: 'Soft Blue', nameAr: 'أزرق هادئ', nameKu: 'شيونی هێمن', type: 'light', colors: { primary: '#3B82F6', secondary: '#93C5FD', bg: '#EFF6FF' } },
   { id: 'pastel', nameEn: 'Pastel', nameAr: 'عصري ناعم', nameKu: 'پاستێل', type: 'light', colors: { primary: '#EC4899', secondary: '#F9A8D4', bg: '#FDF2F8' } },
   { id: 'amoled', nameEn: 'AMOLED Black', nameAr: 'أسود نقي', nameKu: 'ڕەش', type: 'dark', colors: { primary: '#06B6D4', secondary: '#22D3EE', bg: '#000000' } },
   { id: 'sunny', nameEn: 'Sunny', nameAr: 'مشرق', nameKu: 'خۆرەتاو', type: 'light', colors: { primary: '#F59E0B', secondary: '#FBBF24', bg: '#FFFBEB' } },
-  { id: 'modern-tech', nameEn: 'Modern Tech', nameAr: 'عصري تقني', nameKu: 'تەکنەلۆژیای مۆدێرن', type: 'dark', colors: { primary: '#7C3AED', secondary: '#8B5CF6', bg: '#1E1B4B' } },
+  { id: 'modern-tech', nameEn: 'Modern Tech', nameAr: 'عصري تقني', nameKu: 'تەکنەلۆژیاي مۆدێرن', type: 'dark', colors: { primary: '#7C3AED', secondary: '#8B5CF6', bg: '#1E1B4B' } },
   
   // New 5 Themes
   { id: 'emerald-night', nameEn: 'Emerald Night', nameAr: 'زمردي ليلي', nameKu: 'زمردی شەوانە', type: 'dark', colors: { primary: '#10B981', secondary: '#059669', bg: '#064E3B' } },
@@ -83,10 +83,10 @@ export const CATEGORIES: {id: PatientCategory | 'all', label: string, labelAr: s
     { id: 'rct', label: 'RCT', labelAr: 'عصب', labelKu: 'دەمار' },
     { id: 'cleaning', label: 'Cleaning', labelAr: 'تنظيف', labelKu: 'پاككردنەوە' },
     { id: 'implant', label: 'Implant', labelAr: 'زراعة', labelKu: 'چاندن' },
-    { id: 'smile', label: 'Smile Design', labelAr: 'ابتسامة', labelKu: 'دیزاینی پێکەنین' },
+    { id: 'smile', label: 'Smile Design', labelAr: 'ابتسامة', labelKu: 'دیزاینی پێکەنين' },
     { id: 'whitening', label: 'Whitening', labelAr: 'تبييض', labelKu: 'سپیکردنەوە' },
     { id: 'crown', label: 'Crown', labelAr: 'تغليف', labelKu: 'رووپۆش' },
-    { id: 'surgery', label: 'Surgery', labelAr: 'جراحة', labelKu: 'نەشتەرگەری' },
+    { id: 'surgery', label: 'Surgery', labelAr: 'جراحة', labelKu: 'نەشتەرگەري' },
     { id: 'ortho', label: 'Orthodontics', labelAr: 'تقويم', labelKu: 'راستكردنەوە' },
     { id: 'other', label: 'Other', labelAr: 'أخرى', labelKu: 'هیتر' },
 ];
@@ -101,13 +101,13 @@ export const MEMO_COLORS = [
 ];
 
 export const DAY_COLORS = [
-  'bg-red-50 border-red-100 text-red-900 dark:bg-red-900/20 dark:border-red-800 dark:text-red-100', // Sunday
-  'bg-orange-50 border-orange-100 text-orange-900 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-100', // Monday
-  'bg-yellow-50 border-yellow-100 text-yellow-900 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-100', // Tuesday
-  'bg-green-50 border-green-100 text-green-900 dark:bg-green-900/20 dark:border-green-800 dark:text-green-100', // Wednesday
-  'bg-teal-50 border-teal-100 text-teal-900 dark:bg-teal-900/20 dark:border-teal-800 dark:text-teal-100', // Thursday
-  'bg-blue-50 border-blue-100 text-blue-900 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-100', // Friday
-  'bg-purple-50 border-purple-100 text-purple-900 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-100', // Saturday
+  'bg-rose-50 border-rose-200 text-rose-900 dark:bg-rose-900/30 dark:border-rose-800 dark:text-rose-100', // Day 0 (Sunday)
+  'bg-indigo-50 border-indigo-200 text-indigo-900 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-100', // Day 1 (Monday)
+  'bg-zinc-800 border-zinc-700 text-white dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-100', // Day 2 (Tuesday) - Updated to Light Black/Grey as requested
+  'bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-100', // Day 3 (Wednesday)
+  'bg-sky-50 border-sky-200 text-sky-900 dark:bg-sky-900/30 dark:border-sky-800 dark:text-sky-100', // Day 4 (Thursday)
+  'bg-fuchsia-50 border-fuchsia-200 text-fuchsia-900 dark:bg-fuchsia-900/30 dark:border-fuchsia-800 dark:text-fuchsia-100', // Day 5 (Friday)
+  'bg-orange-50 border-orange-200 text-orange-900 dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-100', // Day 6 (Saturday)
 ];
 
 export const MEDICAL_CONDITIONS_LIST = [
@@ -115,7 +115,7 @@ export const MEDICAL_CONDITIONS_LIST = [
     { id: 'hypertension', en: 'Hypertension', ar: 'ارتفاع ضغط الدم', ku: 'بەرزبوونەوەی پەستانی خوێن' },
     { id: 'heart_disease', en: 'Heart Disease', ar: 'أمراض القلب', ku: 'نەخۆشي دڵ' },
     { id: 'asthma', en: 'Asthma', ar: 'الربو', ku: 'ڕەبۆ' },
-    { id: 'hepatitis', en: 'Hepatitis', ar: 'التهاب الكبد', ku: 'هەوکردنی جگەر' },
+    { id: 'hepatitis', en: 'Hepatitis', ar: 'التهاب الكبد', ku: 'هەوکردني جگەر' },
     { id: 'bleeding_disorder', en: 'Bleeding Disorder', ar: 'سيولة الدم', ku: 'کێشەی خوێن بەربوون' },
     { id: 'allergy_penicillin', en: 'Penicillin Allergy', ar: 'حساسية البنسلين', ku: 'حەساسیەت بە پەنسلین' },
     { id: 'allergy_anesthesia', en: 'Anesthesia Allergy', ar: 'حساسية التخدير', ku: 'حەساسیەت بە بەنج' },
@@ -130,7 +130,7 @@ export const PATIENT_QUESTIONS_LIST = [
         id: 'brushing', 
         en: 'How often do you brush?', 
         ar: 'كم مرة تفرش أسنانك؟', 
-        ku: 'چەند جار ددان دەشۆیت؟',
+        ku: 'چەند جار ددان دەشۆيت؟',
         options: [
             { id: 'none', en: 'Never', ar: 'لا أفرش', ku: 'ناشۆم' },
             { id: 'once', en: 'Once a day', ar: 'مرة واحدة', ku: 'یەک جار' },
@@ -187,7 +187,7 @@ export const PATIENT_QUESTIONS_LIST = [
         id: 'pain_type', 
         en: 'Type of pain?', 
         ar: 'نوع الألم؟', 
-        ku: 'جۆری ئازار؟',
+        ku: 'جۆري ئازار؟',
         options: [
             { id: 'none', en: 'No Pain', ar: 'لا يوجد', ku: 'نییە' },
             { id: 'sharp', en: 'Sharp', ar: 'حاد', ku: 'توند' },
@@ -205,7 +205,7 @@ export const PATIENT_QUESTIONS_LIST = [
             { id: 'none', en: 'None', ar: 'لا يوجد', ku: 'نییە' },
             { id: 'cold', en: 'Cold', ar: 'البارد', ku: 'سارد' },
             { id: 'hot', en: 'Hot', ar: 'الحار', ku: 'گەرم' },
-            { id: 'sweet', en: 'Sweets', ar: 'الحلويات', ku: 'شیرینی' },
+            { id: 'sweet', en: 'Sweets', ar: 'الحلويات', ku: 'شيرينی' },
             { id: 'pressure', en: 'Pressure/Biting', ar: 'الضغط/العض', ku: 'گازگرتن' }
         ]
     },
@@ -213,7 +213,7 @@ export const PATIENT_QUESTIONS_LIST = [
         id: 'anxiety',
         en: 'Dental Anxiety?',
         ar: 'هل لديك خوف أو قلق من علاج الأسنان؟',
-        ku: 'ئایا ترست هەیە لە چارەسەری ددان؟',
+        ku: 'ئایا ترست هەیە لە چارەسەري ددان؟',
         options: [
             { id: 'yes', en: 'Yes', ar: 'نعم', ku: 'بەڵێ' },
             { id: 'no', en: 'No', ar: 'لا', ku: 'نەخێر' },
@@ -234,7 +234,7 @@ export const PRICING_PLANS = [
         { en: 'Cloud Sync', ar: 'مزامنة سحابية', ku: 'هاوکاتکردنی هەوری' },
         { en: '24/7 Support', ar: 'دعم فني', ku: 'پاڵپشتی ٢٤/٧' },
         { en: 'Unlimited Devices', ar: 'عدد غير محدود من الاجهزة', ku: 'ژمارەی بێسنوور لە ئامێرەکان' },
-        { en: 'Free Rx Design', ar: 'تصميم وصفة طبية مجاني', ku: 'دیزاینی ڕەچەتە بەخۆڕایی' },
+        { en: 'Free Rx Design', ar: 'تصميم وصفة طبية مجاني', ku: 'دیزايني ڕەچەتة بەخۆڕایی' },
     ]
   },
   { 
@@ -248,7 +248,7 @@ export const PRICING_PLANS = [
         { en: 'Cloud Sync', ar: 'مزامنة سحابية', ku: 'هاوکاتکردنی هەوری' },
         { en: '24/7 Support', ar: 'دعم فني', ku: 'پاڵپشتی ٢٤/٧' },
         { en: 'Unlimited Devices', ar: 'عدد غير محدود من الاجهزة', ku: 'ژمارەی بێسنوور لە ئامێرەکان' },
-        { en: 'Free Rx Design', ar: 'تصميم وصفة طبية مجاني', ku: 'دیزاینی ڕەچەتە بەخۆڕایی' },
+        { en: 'Free Rx Design', ar: 'تصميم وصفة طبية مجاني', ku: 'دیزاینی ڕەچەتة بەخۆڕایی' },
     ]
   },
   { 
@@ -262,8 +262,8 @@ export const PRICING_PLANS = [
         { en: 'Cloud Sync', ar: 'مزامنة سحابية', ku: 'هاوکاتکردنی هەوری' },
         { en: '24/7 Support', ar: 'دعم فني', ku: 'پاڵپشتی ٢٤/٧' },
         { en: 'Unlimited Devices', ar: 'عدد غير محدود من الاجهزة', ku: 'ژمارەی بێسنوور لە ئامێرەکان' },
-        { en: 'Free Rx Design', ar: 'تصميم وصفة طبية مجاني', ku: 'دیزاینی ڕەچەتە بەخۆڕایی' },
-        { en: 'Free Consent Form Design', ar: 'تصميم ورقة موافقة عمل مجاني', ku: 'دیزاینی فۆرمی ڕەزامەندی بەخۆڕایی' },
+        { en: 'Free Rx Design', ar: 'تصميم وصفة طبية مجاني', ku: 'دیزايني ڕەچەتة بەخۆڕایی' },
+        { en: 'Free Consent Form Design', ar: 'تصميم ورقة موافقة عمل مجاني', ku: 'دیزايني فۆرمی ڕەزامەندي بەخۆڕایی' },
     ]
   },
   { 
@@ -277,8 +277,8 @@ export const PRICING_PLANS = [
         { en: 'Cloud Sync', ar: 'مزامنة سحابية', ku: 'هاوکاتکردنی هەوری' },
         { en: '24/7 Support', ar: 'دعم فني', ku: 'پاڵپشتی ٢٤/٧' },
         { en: 'Unlimited Devices', ar: 'عدد غير محدود من الاجهزة', ku: 'ژمارەی بێسنوور لە ئامێرەکان' },
-        { en: '3 Free Rx Designs', ar: '3 تصاميم وصفة طبية مجانية', ku: '٣ دیزاینی ڕەچەتە بەخۆڕایی' },
-        { en: 'Free Consent Form Design', ar: 'تصميم ورقة موافقة عمل مجانية', ku: 'دیزاینی فۆرمی ڕەزامەندی بەخۆڕایی' },
+        { en: '3 Free Rx Designs', ar: '3 تصاميم وصفة طبية مجانية', ku: '٣ ديزايني ڕەچەتة بەخۆڕایی' },
+        { en: 'Free Consent Form Design', ar: 'تصميم ورقة موافقة عمل مجانية', ku: 'دیزايني فۆرمي ڕەزامەندي بەخۆڕایی' },
     ]
   },
 ];
