@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Activity, Globe, ArrowRight, Instagram, CheckCircle2, ChevronDown, User, Grid, Calendar, DollarSign, FlaskConical, FileText, BarChart3, Cloud, LayoutDashboard, StickyNote, ShoppingBag, PlusCircle, Sparkles, MonitorSmartphone, Palette, UsersRound, X, Database, Paintbrush, ShieldCheck, UserCog, Contact, Image as ImageIcon } from 'lucide-react';
 import { PRICING_PLANS } from '../constants';
-import { LABELS } from '../types';
+// Fixed: LABELS is exported from ../locales, not ../types
+import { LABELS } from '../locales';
 import { Logo } from './Logo';
 
 interface LandingPageProps {

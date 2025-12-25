@@ -1,5 +1,6 @@
 
-import { ClinicData, INITIAL_DATA } from '../types';
+import { ClinicData } from '../types';
+import { INITIAL_DATA } from '../initialData';
 
 const STORAGE_KEY = 'dental_flow_db';
 
@@ -41,7 +42,6 @@ export const storageService = {
       reader.onload = (e) => {
         try {
           const json = JSON.parse(e.target?.result as string);
-          // Basic validation
           if (json.patients && Array.isArray(json.patients) && json.settings) {
             resolve(json);
           } else {

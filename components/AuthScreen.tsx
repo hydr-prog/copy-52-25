@@ -1,6 +1,9 @@
+
 import React from 'react';
 import { Activity, X, Mail, Lock, Loader2, Instagram, LayoutDashboard } from 'lucide-react';
-import { LABELS, Language } from '../types';
+import { Language } from '../types';
+// Fixed: LABELS is exported from ../locales, not ../types
+import { LABELS } from '../locales';
 import { Logo } from './Logo';
 
 interface AuthScreenProps {

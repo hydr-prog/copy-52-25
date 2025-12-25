@@ -151,7 +151,7 @@ const RealisticTooth: React.FC<{
           {statusLetter && (
              <text 
                x="50" 
-               y="120" 
+               y={isUpper ? "120" : "60"} 
                className="fill-white font-bold text-4xl" 
                textAnchor="middle" 
                dominantBaseline="middle"

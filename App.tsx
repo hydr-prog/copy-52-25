@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud } from 'lucide-react';
-import { ClinicData, Doctor, Secretary, Patient, INITIAL_DATA, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, LABELS, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle } from './types';
+import { ClinicData, Doctor, Secretary, Patient, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle } from './types';
+import { INITIAL_DATA } from './initialData';
+import { LABELS } from './locales';
 import { storageService } from './services/storage';
 import { supabaseService } from './services/supabase';
 import { googleDriveService } from './services/googleDrive';
@@ -47,7 +49,6 @@ export default function App() {
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   
-  // State for appointment patient if opened from list directly
   const [apptPatientId, setApptPatientId] = useState<string | null>(null);
 
   const [patientTab, setPatientTab] = useState<'overview' | 'chart' | 'visits' | 'finance' | 'prescriptions' | 'documents'>('overview');
@@ -161,7 +162,7 @@ export default function App() {
   const isSecretary = !!activeSecretaryId;
 
   useEffect(() => {
-      if (appState === 'app' || appState === 'profile_select') {
+      if (appState === 'app' || appState === 'profile_select' || appState === 'auth') {
           localStorage.setItem('dentro_device_lang', deviceLang);
           setData(prev => ({ ...prev, settings: { ...prev.settings, language: deviceLang } }));
       }
@@ -316,7 +317,6 @@ export default function App() {
             const merged = mergeDataWithLocalPrefs(imported);
             setData(merged); storageService.saveData(merged);
         } else {
-            // MERGE Logic
             setData(prev => {
                 const existingPatientIds = new Set(prev.patients.map(p => p.id));
                 const newPatients = imported.patients.filter(p => !existingPatientIds.has(p.id));
@@ -369,6 +369,7 @@ export default function App() {
   const handleSaveMemo = (title: string, content: string, color: string, type: 'text'|'todo' = 'text', todos: TodoItem[], style?: MemoStyle) => { if (selectedMemo) updateLocalData(prev => ({ ...prev, memos: prev.memos.map(m => m.id === selectedMemo.id ? { ...m, title, content, color, type, todos, style } : m) })); else { const newMemo: Memo = { id: Date.now().toString(), title, content, color, type, todos, date: new Date().toISOString(), style }; updateLocalData(prev => ({ ...prev, memos: [newMemo, ...(prev.memos || [])] })); } setShowMemoModal(false); setSelectedMemo(null); setMemoType(null); };
   const handleDeleteMemo = (id: string) => updateLocalData(prev => ({ ...prev, memos: prev.memos.filter(m => m.id !== id) }));
   const handleSaveSupply = (name: string, quantity: number, price: number) => { if (selectedSupply) updateLocalData(prev => ({ ...prev, supplies: prev.supplies.map(s => s.id === selectedSupply.id ? { ...s, name, quantity, price } : s) })); else { const newItem: SupplyItem = { id: Date.now().toString(), name, quantity, price }; updateLocalData(prev => ({ ...prev, supplies: [newItem, ...(prev.supplies || [])] })); } setShowSupplyModal(false); setSelectedSupply(null); };
+  /* Error in file App.tsx on line 372: Cannot find name 'item'. Changed item.id to id */
   const handleDeleteSupply = (id: string) => updateLocalData(prev => ({ ...prev, supplies: prev.supplies.filter(s => s.id !== id) }));
   const handleSaveInventoryItem = (item: Partial<InventoryItem>) => { if (selectedInventoryItem) updateLocalData(prev => ({ ...prev, inventory: (prev.inventory || []).map(i => i.id === selectedInventoryItem.id ? { ...i, ...item } as InventoryItem : i) })); else { const newItem: InventoryItem = { id: Date.now().toString(), name: item.name!, quantity: item.quantity!, minQuantity: item.minQuantity!, price: item.price, expiryDate: item.expiryDate, color: item.color || 'blue' }; updateLocalData(prev => ({ ...prev, inventory: [newItem, ...(prev.inventory || [])] })); } setShowInventoryModal(false); setSelectedInventoryItem(null); };
   const handleDeleteInventoryItem = (id: string) => updateLocalData(prev => ({ ...prev, inventory: (prev.inventory || []).filter(i => i.id !== id) }));
@@ -383,7 +384,6 @@ export default function App() {
   const handleSaveRx = () => { if (newRxMeds.length === 0) return; const patient = data.patients.find(p => p.id === selectedPatientId); if(patient) { const newRx: Prescription = { id: Date.now().toString(), date: new Date().toISOString(), medications: newRxMeds }; updatePatient(selectedPatientId!, { prescriptions: [newRx, ...patient.prescriptions] }); } setShowRxModal(false); setNewRxMeds([]); };
   const handleGoogleDriveLink = async () => { try { const accessToken = await googleDriveService.login(); if (accessToken) { const rootId = await googleDriveService.ensureRootFolder(); updateLocalData(prev => ({ ...prev, settings: { ...prev.settings, googleDriveLinked: true, googleDriveRootId: rootId } })); alert(isRTL ? "تم ربط جوجل درايف بنجاح" : "Google Drive linked successfully!"); } } catch (e: any) { if (e?.error === 'popup_blocked_by_browser') alert(isRTL ? "يرجى السماح بالنوافذ المنبثقة (Popups) في متصفحك لإتمام عملية الربط." : "Please allow popups in your browser to complete the connection."); else alert(t.errorDrive || "Failed to connect. Please try again."); } };
   
-  // Handler for booking from patients list
   const handleQuickBook = (patientId: string) => {
     setApptPatientId(patientId);
     setSelectedAppointment(null);
@@ -416,12 +416,12 @@ export default function App() {
              {currentView === 'purchases' && ( <PurchasesView t={t} data={data} setSelectedSupply={setSelectedSupply} setShowSupplyModal={setShowSupplyModal} handleConvertToExpense={handleConvertToExpense} handleDeleteSupply={handleDeleteSupply} openConfirm={openConfirm} /> )}
              {currentView === 'inventory' && ( <InventoryView t={t} data={data} setSelectedInventoryItem={setSelectedInventoryItem} setShowInventoryModal={setShowInventoryModal} handleDeleteInventoryItem={handleDeleteInventoryItem} openConfirm={openConfirm} /> )}
              {currentView === 'expenses' && ( <ExpensesView t={t} data={data} setData={setData} setSelectedExpense={setSelectedExpense} setShowExpenseModal={setShowExpenseModal} handleDeleteExpense={handleDeleteExpense} openConfirm={openConfirm} /> )}
-             {currentView === 'labOrders' && ( <LabOrdersView t={t} data={data} setSelectedLabOrder={setSelectedLabOrder} setShowLabOrderModal={setShowLabOrderModal} handleDeleteLabOrder={handleDeleteLabOrder} handleUpdateLabOrderStatus={handleUpdateLabOrderStatus} openConfirm={openConfirm} currentLang={currentLang} /> )}
+             {currentView === 'labOrders' && ( <LabOrdersView t={t} data={data} setData={setData} setSelectedLabOrder={setSelectedLabOrder} setShowLabOrderModal={setShowLabOrderModal} handleDeleteLabOrder={handleDeleteLabOrder} handleUpdateLabOrderStatus={handleUpdateLabOrderStatus} openConfirm={openConfirm} currentLang={currentLang} /> )}
              {currentView === 'settings' && ( <SettingsView t={t} data={data} setData={setData} handleAddDoctor={handleAddDoctorFull} handleUpdateDoctor={handleUpdateDoctor} handleDeleteDoctor={handleDeleteDoctor} handleAddSecretary={handleAddSecretary} handleDeleteSecretary={handleDeleteSecretary} handleRxFileUpload={handleRxFileUpload} handleImportData={handleImportData} syncStatus={syncStatus} deferredPrompt={deferredPrompt} handleInstallApp={handleInstallApp} openConfirm={openConfirm} currentLang={currentLang} setDeviceLang={setDeviceLang} currentTheme={currentThemeMode} setLocalTheme={toggleLocalTheme} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} activeDoctorId={activeDoctorId} activeSecretaryId={activeSecretaryId} deviceScale={deviceScale} setDeviceScale={setDeviceScale} onLinkDrive={handleGoogleDriveLink} /> )}
          </div>
       </main>
       <PrintLayouts t={t} data={data} activePatient={activePatient} printingRx={printingRx} setPrintingRx={setPrintingRx} printingPayment={printingPayment} setPrintingPayment={setPrintingPayment} printingAppointment={printingAppointment} setPrintingAppointment={setPrintingAppointment} printingDocument={printingDocument} setPrintingDocument={setPrintingDocument} currentLang={currentLang} isRTL={isRTL} />
-      <PatientModal show={showNewPatientModal || showEditPatientModal} onClose={() => { setShowNewPatientModal(false); setShowEditPatientModal(false); }} t={t} isRTL={isRTL} currentLang={currentLang} data={activeDoctorId ? filteredData : data} handleAddPatient={handleAddPatient} updatePatient={updatePatient} guestToConvert={guestToConvert} activePatient={showEditPatientModal ? activePatient : null} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} />
+      <PatientModal show={showNewPatientModal || showEditPatientModal} onClose={() => { setShowNewPatientModal(false); setShowEditPatientModal(false); }} t={t} isRTL={isRTL} currentLang={currentLang} data={activeDoctorId ? filteredData : data} handleAddPatient={handleAddPatient} updatePatient={updatePatient} guestToConvert={guestToConvert} activePatient={showEditPatientModal ? activePatient : null} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} activeDoctorId={activeDoctorId} />
       <PaymentModal show={showPaymentModal} onClose={() => setShowPaymentModal(false)} t={t} activePatient={activePatient} paymentType={paymentType} data={data} handleAddPatient={handleAddPatient} currentLang={currentLang} />
       <AppointmentModal show={showAppointmentModal} onClose={() => { setShowAppointmentModal(false); setApptPatientId(null); }} t={t} selectedAppointment={selectedAppointment} appointmentMode={appointmentMode} setAppointmentMode={setAppointmentMode} selectedPatientId={apptPatientId || selectedPatientId} data={activeDoctorId ? filteredData : data} currentDate={currentDate} handleAddAppointment={handleAddAppointment} isRTL={isRTL} currentLang={currentLang} />
       <AddMasterDrugModal show={showAddMasterDrugModal} onClose={() => setShowAddMasterDrugModal(false)} t={t} data={data} handleManageMedications={handleManageMedications} handleDeleteMasterDrug={handleDeleteMasterDrug} currentLang={currentLang} openConfirm={openConfirm} />

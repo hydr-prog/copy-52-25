@@ -1,13 +1,14 @@
 
-
 import React, { useState } from 'react';
-import { Plus, FlaskConical, Filter, Edit2, Trash2, CheckCircle2, Search } from 'lucide-react';
+import { Plus, FlaskConical, Filter, Edit2, Trash2, CheckCircle2, Search, Settings } from 'lucide-react';
 import { ClinicData, LabOrder } from '../types';
 import { getLocalizedDate } from '../utils';
+import { LabSettingsModal } from './AppModals';
 
 interface LabOrdersViewProps {
   t: any;
   data: ClinicData;
+  setData: React.Dispatch<React.SetStateAction<ClinicData>>;
   setSelectedLabOrder: (order: LabOrder | null) => void;
   setShowLabOrderModal: (show: boolean) => void;
   handleDeleteLabOrder: (id: string) => void;
@@ -17,10 +18,11 @@ interface LabOrdersViewProps {
 }
 
 export const LabOrdersView: React.FC<LabOrdersViewProps> = ({
-  t, data, setSelectedLabOrder, setShowLabOrderModal, handleDeleteLabOrder, handleUpdateLabOrderStatus, openConfirm, currentLang
+  t, data, setData, setSelectedLabOrder, setShowLabOrderModal, handleDeleteLabOrder, handleUpdateLabOrderStatus, openConfirm, currentLang
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const filteredOrders = (data.labOrders || []).filter(order => {
       const matchStatus = filterStatus === 'all' || order.status === filterStatus;
@@ -52,18 +54,29 @@ export const LabOrdersView: React.FC<LabOrdersViewProps> = ({
 
   return (
     <div className="w-full animate-fade-in pb-10">
+      <LabSettingsModal show={showSettingsModal} onClose={() => setShowSettingsModal(false)} t={t} data={data} setData={setData} currentLang={currentLang} />
+      
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800 dark:text-white">{t.labOrders}</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">{t.manageLabOrders}</p>
         </div>
-        <button 
-          onClick={() => { setSelectedLabOrder(null); setShowLabOrderModal(true); }}
-          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-xl shadow-lg shadow-primary-500/30 transition"
-        >
-          <Plus size={20} />
-          <span>{t.newLabOrder}</span>
-        </button>
+        
+        <div className="flex gap-2">
+            <button 
+              onClick={() => setShowSettingsModal(true)}
+              className="p-3 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-xl shadow-sm hover:shadow-md transition active:scale-95"
+            >
+              <Settings size={20} />
+            </button>
+            <button 
+              onClick={() => { setSelectedLabOrder(null); setShowLabOrderModal(true); }}
+              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-5 py-3 rounded-xl shadow-lg shadow-primary-500/30 transition transform active:scale-95"
+            >
+              <Plus size={20} />
+              <span className="font-bold">{t.newLabOrder}</span>
+            </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -74,8 +87,8 @@ export const LabOrdersView: React.FC<LabOrdersViewProps> = ({
                type="text" 
                value={searchQuery}
                onChange={(e) => setSearchQuery(e.target.value)}
-               placeholder={t.searchPatients} // Reusing search placeholder or generic
-               className="w-full ps-12 pe-4 py-3 rounded-xl border-none shadow-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:ring-2 focus:ring-primary-500 transition"
+               placeholder={t.searchPatients}
+               className="w-full ps-12 pe-4 py-3 rounded-xl border-none shadow-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-white focus:ring-2 focus:ring-primary-500 transition font-bold"
              />
           </div>
           <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl shadow-sm overflow-x-auto no-scrollbar">
@@ -117,31 +130,31 @@ export const LabOrdersView: React.FC<LabOrdersViewProps> = ({
 
                       <div className="space-y-2 mb-4 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl">
                           <div className="flex justify-between">
-                              <span className="text-gray-400">{t.labName}:</span>
-                              <span className="font-medium">{order.labName}</span>
+                              <span className="text-gray-400 font-bold">{t.labName}:</span>
+                              <span className="font-black">{order.labName}</span>
                           </div>
                           {order.toothNumbers && (
                               <div className="flex justify-between">
-                                  <span className="text-gray-400">{t.toothNumbers}:</span>
-                                  <span className="font-medium">{order.toothNumbers}</span>
+                                  <span className="text-gray-400 font-bold">{t.toothNumbers}:</span>
+                                  <span className="font-black">{order.toothNumbers}</span>
                               </div>
                           )}
                           {order.shade && (
                               <div className="flex justify-between">
-                                  <span className="text-gray-400">{t.shade}:</span>
-                                  <span className="font-medium">{order.shade}</span>
+                                  <span className="text-gray-400 font-bold">{t.shade}:</span>
+                                  <span className="font-black bg-white dark:bg-gray-600 px-2 rounded-md shadow-sm">{order.shade}</span>
                               </div>
                           )}
                           {order.sentDate && (
                               <div className="flex justify-between">
-                                  <span className="text-gray-400">{t.sentDate}:</span>
-                                  <span className="font-medium">{getLocalizedDate(new Date(order.sentDate), 'day', currentLang)}</span>
+                                  <span className="text-gray-400 font-bold">{t.sentDate}:</span>
+                                  <span className="font-bold">{getLocalizedDate(new Date(order.sentDate), 'day', currentLang)}</span>
                               </div>
                           )}
                           {order.price && (
                               <div className="flex justify-between">
-                                  <span className="text-gray-400">{t.price}:</span>
-                                  <span className="font-bold text-gray-800 dark:text-white">{data.settings.currency} {order.price}</span>
+                                  <span className="text-gray-400 font-bold">{t.price}:</span>
+                                  <span className="font-black text-gray-800 dark:text-white">{data.settings.currency} {order.price}</span>
                               </div>
                           )}
                       </div>

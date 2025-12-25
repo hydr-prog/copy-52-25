@@ -1,3 +1,4 @@
+
 import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage, degrees } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { ClinicData, Patient, Prescription, Payment, Appointment } from '../types';
@@ -131,8 +132,11 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
     const rxConfig = data.settings.rxTemplate?.rxSymbol || { fontSize: 30, color: '#000000', isBold: true, isItalic: true };
     const medsConfig = data.settings.rxTemplate?.medications || { fontSize: 14, color: '#000000', isBold: true, isItalic: false };
     const customTopMargin = data.settings.rxTemplate?.topMargin ?? 100;
+    const paperSizeChoice = data.settings.rxTemplate?.paperSize || 'A5';
 
-    const page = pdfDoc.addPage([420, 595]); // A5 Size
+    // Set Page Size based on selection
+    const pageDimensions: [number, number] = paperSizeChoice === 'A4' ? [595, 842] : [420, 595];
+    const page = pdfDoc.addPage(pageDimensions);
     const { width, height } = page.getSize();
     const margin = 25;
     const isRTL = currentLang === 'ar' || currentLang === 'ku';
@@ -204,10 +208,10 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
         drawText(page, patient.name, width - margin - 40, y, fontBold, valueSize, 'right', valueColor);
         
         // Age (Middle - Shifted Right)
-        drawText(page, tAge, width - margin - 190, y, fontBold, labelSize, 'right', labelColor);
-        drawText(page, `${patient.age}`, width - margin - 230, y, fontRegular, valueSize, 'right', valueColor);
+        drawText(page, tAge, width - margin - (paperSizeChoice === 'A4' ? 250 : 190), y, fontBold, labelSize, 'right', labelColor);
+        drawText(page, `${patient.age}`, width - margin - (paperSizeChoice === 'A4' ? 300 : 230), y, fontRegular, valueSize, 'right', valueColor);
 
-        // Date (Left - Increased Space to 100)
+        // Date (Left)
         drawText(page, tDate, margin + 100, y, fontBold, labelSize, 'right', labelColor); 
         drawText(page, dateStr, margin, y, fontRegular, valueSize, 'left', valueColor);
     } else {
@@ -215,9 +219,9 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
         drawText(page, tName, margin, y, fontBold, labelSize, 'left', labelColor);
         drawText(page, patient.name, margin + 50, y, fontBold, valueSize, 'left', valueColor);
         
-        // Age (Middle - Shifted further left to avoid overlap with Date)
-        drawText(page, tAge, margin + 170, y, fontBold, labelSize, 'left', labelColor);
-        drawText(page, `${patient.age}`, margin + 210, y, fontRegular, valueSize, 'left', valueColor);
+        // Age (Middle)
+        drawText(page, tAge, margin + (paperSizeChoice === 'A4' ? 230 : 170), y, fontBold, labelSize, 'left', labelColor);
+        drawText(page, `${patient.age}`, margin + (paperSizeChoice === 'A4' ? 280 : 210), y, fontRegular, valueSize, 'left', valueColor);
 
         // Date (Right)
         drawText(page, tDate, width - margin - 100, y, fontBold, labelSize, 'left', labelColor);
@@ -258,12 +262,9 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
         currentX += numWidth + 10; 
 
         // 2. Drug Name (Applied Custom Style)
-        // Note: Passing medsConfig.isItalic to the helper
         drawText(page, med.name, currentX, y, medsFont, medsSize, 'left', medsColor, undefined, medsConfig.isItalic);
         
-        // Calculate width to position next elements
         const nameWidth = medsFont.widthOfTextAtSize(med.name, medsSize);
-        // Simple heuristic for mixed arabic/english width
         const estimatedNameWidth = nameWidth > 0 ? nameWidth : med.name.length * (medsSize * 0.5); 
         currentX += estimatedNameWidth + 10; 
 
@@ -275,8 +276,6 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
         
         const detailsText = detailsParts.join(' - ');
         if (detailsText) {
-            // Details usually kept slightly smaller or standard black for readability, but can follow config if desired.
-            // For now, keeping details standard to differentiate from drug name
             drawText(page, detailsText, currentX, y, fontRegular, Math.max(10, medsSize - 2), 'left', COLORS.primary);
         }
 
@@ -284,7 +283,7 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
             y -= (medsSize + 5);
             drawText(page, `(${med.notes})`, margin + 20, y, fontRegular, Math.max(10, medsSize - 3), 'left', COLORS.secondary);
         }
-        y -= (medsSize * 2.5); // Dynamic spacing based on font size
+        y -= (medsSize * 2.5);
     });
 
     const pdfBytes = await pdfDoc.save();
@@ -299,9 +298,7 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     const fontRegular = await pdfDoc.embedFont(fontBytes);
     const fontBold = await pdfDoc.embedFont(fontBoldBytes);
 
-    // Standard 80mm Thermal Receipt width is ~226 pts
     const pageWidth = 226;
-    // Estimate height based on content
     const pageHeight = 500; 
     const page = pdfDoc.addPage([pageWidth, pageHeight]);
     
@@ -309,12 +306,9 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     const margin = 10;
     let y = pageHeight - 30;
 
-    // --- Header ---
-    // Removed phone from header to avoid confusion with ID numbers as requested by user
     drawText(page, data.clinicName, centerX, y, fontBold, 16, 'center', COLORS.accent);
     y -= 25;
 
-    // Fix: Use CURRENT system time for printing to avoid the date-only "03:00" timezone bug
     const printTimeStr = format(new Date(), 'yyyy-MM-dd  HH:mm');
     drawText(page, printTimeStr, centerX, y, fontRegular, 9, 'center', COLORS.secondary);
     y -= 12;
@@ -322,11 +316,9 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     drawDashedLine(page, margin, pageWidth - margin, y);
     y -= 20;
 
-    // --- Title ---
     drawText(page, t.receipt, centerX, y, fontBold, 14, 'center', COLORS.accent);
     y -= 20;
 
-    // --- Patient Info ---
     const isRTL = /[\u0600-\u06FF]/.test(t.name);
     
     if (isRTL) {
@@ -341,7 +333,6 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     drawLine(page, margin, pageWidth - margin, y, 1, COLORS.line);
     y -= 20;
 
-    // --- Transaction Details (Centered) ---
     const label = payment.type === 'payment' ? t.paymentReceived : t.treatmentCost;
     const amountStr = `${payment.amount.toLocaleString()} ${data.settings.currency}`;
     
@@ -358,14 +349,12 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     drawDashedLine(page, margin, pageWidth - margin, y);
     y -= 20;
 
-    // --- Financial Summary ---
     const totalCost = patient.payments.filter(p => p.type === 'charge').reduce((a, c) => a + c.amount, 0);
     const totalPaid = patient.payments.filter(p => p.type === 'payment').reduce((a, c) => a + c.amount, 0);
     const rem = totalCost - totalPaid;
 
     const rowSpace = 16;
 
-    // Helper for summary rows
     const drawSummaryRow = (label: string, value: number, isBold = false) => {
         const font = isBold ? fontBold : fontRegular;
         const color = isBold ? COLORS.accent : COLORS.primary;
@@ -389,13 +378,9 @@ export const generatePaymentPdf = async (data: ClinicData, patient: Patient, pay
     drawLine(page, margin, pageWidth - margin, y, 0.5, COLORS.line);
     y -= 15;
     
-    // Remaining Balance (Prominent)
     drawSummaryRow(t.remaining, rem, true);
 
-    y -= 40; // Increased spacing for footer
-    
-    // --- Footer ---
-    // Removed Clinic Phone completely as requested by the user ("I don't want any mention of it")
+    y -= 40; 
     drawText(page, t.thankYou, centerX, y, fontRegular, 10, 'center', COLORS.secondary);
 
     const pdfBytes = await pdfDoc.save();
@@ -411,25 +396,21 @@ export const generateAppointmentPdf = async (data: ClinicData, appointment: Appo
     const fontBold = await pdfDoc.embedFont(fontBoldBytes);
 
     const pageWidth = 226;
-    const pageHeight = 400; // Smaller height for tickets
+    const pageHeight = 400; 
     const page = pdfDoc.addPage([pageWidth, pageHeight]);
     const centerX = pageWidth / 2;
     const margin = 15;
     let y = pageHeight - 30;
 
-    // Header
     drawText(page, data.clinicName, centerX, y, fontBold, 15, 'center', COLORS.accent);
     y -= 25;
     
-    // Title (No Box)
     drawText(page, t.appointmentTicket, centerX, y, fontBold, 14, 'center', COLORS.primary);
     y -= 15;
 
-    // Line
     drawDashedLine(page, margin, pageWidth - margin, y);
     y -= 20;
 
-    // Formatting Values
     const apptDate = new Date(appointment.date);
     const dateStr = apptDate.toLocaleDateString();
     
@@ -443,28 +424,24 @@ export const generateAppointmentPdf = async (data: ClinicData, appointment: Appo
         timeStr = `${hours}:${m} ${ampm}`;
     } catch (e) { /* fallback */ }
 
-    // Patient
     drawText(page, t.name, centerX, y, fontBold, 11, 'center', COLORS.secondary);
-    y -= 22; // Increased spacing
+    y -= 22; 
     drawText(page, appointment.patientName, centerX, y, fontBold, 14, 'center', COLORS.accent);
     y -= 25;
 
-    // Date
     drawText(page, t.date, centerX, y, fontBold, 11, 'center', COLORS.secondary);
-    y -= 22; // Increased spacing
+    y -= 22; 
     drawText(page, dateStr, centerX, y, fontBold, 16, 'center', COLORS.accent);
     y -= 25;
 
-    // Time
     drawText(page, t.time, centerX, y, fontBold, 11, 'center', COLORS.secondary);
-    y -= 22; // Increased spacing
+    y -= 22; 
     drawText(page, timeStr, centerX, y, fontBold, 18, 'center', COLORS.accent);
     y -= 25;
 
     drawLine(page, margin, pageWidth - margin, y, 1, COLORS.line);
     y -= 20;
     
-    // Notes / Footer
     if (data.settings.clinicPhone) {
         drawText(page, `Tel: ${data.settings.clinicPhone}`, centerX, y, fontRegular, 10, 'center', COLORS.secondary);
         y -= 15;
@@ -513,7 +490,6 @@ export const generateDocumentPdf = async (data: ClinicData, patient: Patient, do
 
     let y = height - 40;
 
-    // 1. Clinic Header (Similar to Rx if no BG)
     if (!bgImageStr) {
         drawText(page, data.clinicName, width / 2, y, fontBold, 18, 'center', COLORS.accent);
         y -= 15;
@@ -525,11 +501,9 @@ export const generateDocumentPdf = async (data: ClinicData, patient: Patient, do
         drawLine(page, margin, width - margin, y, 1, COLORS.line);
         y -= 25;
     } else {
-        // If there's a background, we use the custom top margin to start the content
         y = height - (doc.topMargin || 130);
     }
 
-    // 2. Patient Information
     const currentLang = data.settings.language || 'ar'; 
     const isRTL = currentLang === 'ar' || currentLang === 'ku';
     const labelColor = COLORS.accent;
@@ -574,7 +548,6 @@ export const generateDocumentPdf = async (data: ClinicData, patient: Patient, do
     drawLine(page, margin, width - margin, y, 1, COLORS.primary);
     y -= 30;
 
-    // 3. Document Body
     const lines = doc.text.split('\n');
     const align = doc.align || 'right';
     const fontSize = doc.fontSize || 12;

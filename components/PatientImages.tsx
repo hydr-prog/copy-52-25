@@ -181,21 +181,25 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
       }
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
       if (zoom <= 1 && rotation === 0) return; 
       setIsDragging(true);
-      dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y };
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      dragStart.current = { x: clientX - position.x, y: clientY - position.y };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
       if (!isDragging) return;
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
       setPosition({
-          x: e.clientX - dragStart.current.x,
-          y: e.clientY - dragStart.current.y
+          x: clientX - dragStart.current.x,
+          y: clientY - dragStart.current.y
       });
   };
 
-  const handleMouseUp = () => {
+  const handleEnd = () => {
       setIsDragging(false);
   };
 
@@ -280,7 +284,7 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
                                 <span className="text-[8px] md:text-[10px] font-bold uppercase tracking-tighter">HD...</span>
                             </div>
                         )}
-                        <button onClick={toggleFullscreen} className="p-2 md:p-3 hover:bg-white/10 rounded-full transition text-white/80 hidden sm:block">
+                        <button onClick={toggleFullscreen} className="p-2 md:p-3 hover:bg-white/10 rounded-full transition text-white/80">
                             <Maximize size={20} />
                         </button>
                         <button onClick={resetViewer} className="p-2 md:p-2 hover:bg-white/10 rounded-full transition group">
@@ -292,10 +296,14 @@ export const PatientImages: React.FC<PatientImagesProps> = ({ t, patient, onUpda
                 {/* Display Area */}
                 <div 
                     className="flex-1 relative flex items-center justify-center overflow-hidden p-4 cursor-grab active:cursor-grabbing"
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
+                    onMouseDown={handleStart}
+                    onMouseMove={handleMove}
+                    onMouseUp={handleEnd}
+                    onMouseLeave={handleEnd}
+                    onTouchStart={handleStart}
+                    onTouchMove={handleMove}
+                    onTouchEnd={handleEnd}
+                    style={{ touchAction: 'none' }}
                 >
                     {viewerUrl ? (
                         <img 

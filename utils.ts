@@ -1,11 +1,11 @@
 
-import { LABELS, Language } from './types';
+import { Language } from './types';
+import { LABELS } from './locales';
 import { TREATMENT_TYPES } from './constants';
 // @ts-ignore
 import ArabicReshaper from 'arabic-persian-reshaper';
 
 export const hexToRgb = (hex: string): string => {
-  // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
   const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
   hex = hex.replace(shorthandRegex, (m, r, g, b) => {
     return r + r + g + g + b + b;
@@ -54,32 +54,18 @@ export const getTreatmentLabel = (typeId?: string, currentLang: Language = 'en',
     return type?.en;
 };
 
-// --- ARABIC RESHAPING LOGIC FOR PDF-LIB ---
-
 const normalizeDigits = (str: string) => {
-  // Replace Eastern Arabic numerals (٠-٩) and Persian numerals (۰-۹) with Western numerals (0-9)
   return str.replace(/[٠-٩]/g, d => '0123456789'['٠١٢٣٤٥٦٧٨٩'.indexOf(d)])
             .replace(/[۰-۹]/g, d => '0123456789'['۰۱۲۳۴۵۶۷۸۹'.indexOf(d)]);
 };
 
-/**
- * Reshapes Arabic text (connects letters) and reverses the string visually for PDF-Lib.
- * NOTE: This function handles a single Arabic block. Sentence structure logic 
- * should be handled by the drawing function in pdfGenerator.
- */
 export const processArabicText = (text: string): string => {
   if (!text) return '';
-  
   const normalizedText = normalizeDigits(text);
-
-  // Check if text has Arabic chars
   const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
   if (!arabicPattern.test(normalizedText)) return normalizedText;
-
   try {
-      // Reshape the string to handle letter connections (Ligatures)
       const reshaped = ArabicReshaper.convert(normalizedText);
-      // Reverse strictly for visual rendering in PDF-Lib (LTR canvas)
       return reshaped.split('').reverse().join('');
   } catch (e) {
       console.warn("Reshaping failed", e);
