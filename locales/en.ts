@@ -1,3 +1,4 @@
+
 export const en = {
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
@@ -536,4 +537,12 @@ export const en = {
     textFormat: "Text Format",
     italic: "Italic",
     textDir: "Direction",
+    featureAI: "AI Clinical Assistant",
+    featureAIDesc: "Powered by Google Gemini to analyze patient history and dental charts for smart clinical insights.",
+    financialSettings: "Financial Settings",
+    currency: "Currency",
+    thousandsShortcut: "Thousands Shortcut (000)",
+    thousandsShortcutDesc: "When enabled, three zeros (000) will be automatically added to any number you type in charges or payments. e.g. typing 250 becomes 250,000.",
+    calendarSettings: "Calendar Settings",
+    columnPadding: "Column Width"
 };

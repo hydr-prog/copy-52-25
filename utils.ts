@@ -72,3 +72,21 @@ export const processArabicText = (text: string): string => {
       return text;
   }
 };
+
+/**
+ * Direct WhatsApp Redirect:
+ * Forces the device to open the installed WhatsApp application immediately
+ * without opening a new browser tab or landing page.
+ */
+export const openWhatsApp = (phoneCode: string = '', phone: string = '') => {
+    // Clean the phone number from any symbols or spaces
+    const cleanPhone = `${phoneCode.replace('+', '')}${phone.replace(/\s/g, '')}`;
+    
+    // The 'whatsapp://' protocol triggers the native application directly 
+    // on iOS (iPhone/iPad), Android, and Windows/Mac desktop apps.
+    const directUrl = `whatsapp://send?phone=${cleanPhone}`;
+    
+    // Assigning to window.location.href triggers the OS protocol handler 
+    // without leaving the current app page.
+    window.location.href = directUrl;
+};

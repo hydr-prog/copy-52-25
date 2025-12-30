@@ -15,6 +15,7 @@ export const INITIAL_DATA: ClinicData = {
     { id: '1', name: 'Amoxicillin', dose: '500mg', frequency: '3 times daily', form: 'cap' },
     { id: '2', name: 'Ibuprofen', dose: '400mg', frequency: 'When needed', form: 'tab', notes: 'After food' },
     { id: '3', name: 'Paracetamol', dose: '500mg', frequency: 'Every 6 hours', form: 'tab' },
+    // Fixed: 'font' typo corrected to 'form'
     { id: '4', name: 'Metronidazole', dose: '500mg', frequency: '3 times daily', form: 'tab' },
     { id: '5', name: 'Augmentin', dose: '625mg', frequency: '2 times daily', form: 'tab' },
   ],
@@ -45,6 +46,15 @@ export const INITIAL_DATA: ClinicData = {
     googleDriveLinked: false,
     thousandsShortcut: false,
     geminiApiKey: '',
+    monthViewSettings: {
+      fontSize: 12,
+      columnPadding: 20, // New logic: will be multiplied and added to base width
+      textColor: '#4b5563'
+    },
+    weekViewSettings: {
+      fontSize: 14,
+      textColor: '#111827'
+    },
     rxTemplate: {
         rxSymbol: { fontSize: 30, color: '#000000', isBold: true, isItalic: true },
         medications: { fontSize: 14, color: '#000000', isBold: true, isItalic: false },

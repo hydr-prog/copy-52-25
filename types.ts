@@ -247,6 +247,17 @@ export interface DocumentSettings {
     backgroundImage?: string;
 }
 
+export interface MonthViewSettings {
+  fontSize: number;
+  columnPadding: number;
+  textColor: string;
+}
+
+export interface WeekViewSettings {
+  fontSize: number;
+  textColor: string;
+}
+
 export interface ClinicData {
   clinicName: string;
   doctors: Doctor[];
@@ -281,6 +292,8 @@ export interface ClinicData {
     googleDriveRootId?: string; 
     thousandsShortcut?: boolean;
     geminiApiKey?: string;
+    monthViewSettings?: MonthViewSettings;
+    weekViewSettings?: WeekViewSettings;
     rxTemplate?: {
         rxSymbol: TextStyleConfig;
         medications: TextStyleConfig;

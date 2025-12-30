@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
-import { Filter, ChevronLeft, ChevronRight, Users, Plus, Check, X as XIcon, History, Trash2 } from 'lucide-react';
+import { Filter, ChevronLeft, ChevronRight, Users, Plus, Check, X as XIcon, History, Trash2, Settings, Type as TypeIcon, Layout, Palette } from 'lucide-react';
 import { addMonths, addWeeks, addDays, endOfWeek, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, format } from 'date-fns';
 import { getLocalizedDate, formatTime12, getTreatmentLabel } from '../utils';
 import { DAY_COLORS } from '../constants';
-import { ClinicData } from '../types';
+import { ClinicData, MonthViewSettings, WeekViewSettings } from '../types';
 
 interface CalendarViewProps {
   t: any;
@@ -27,17 +27,58 @@ interface CalendarViewProps {
   setGuestToConvert: (appt: any) => void;
   setShowNewPatientModal: (show: boolean) => void;
   openConfirm: (title: string, message: string, onConfirm: () => void) => void;
+  setData?: React.Dispatch<React.SetStateAction<ClinicData>>;
 }
+
+// Updated: All columns are now white/transparent to look cleaner with borders
+const COLUMN_COLORS = Array(7).fill('bg-white dark:bg-gray-800/40');
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   t, data, currentLang, isRTL, calendarView, setCalendarView, currentDate, setCurrentDate,
   filteredAppointments, setSelectedAppointment, setAppointmentMode, setShowAppointmentModal,
   handleUpdateAppointmentStatus, handleDeleteAppointment, setSelectedPatientId, setCurrentView,
-  setPatientTab, setGuestToConvert, setShowNewPatientModal, openConfirm
+  setPatientTab, setGuestToConvert, setShowNewPatientModal, openConfirm, setData
 }) => {
   const [showCalendarFilter, setShowCalendarFilter] = useState(false);
+  const [showMonthSettings, setShowMonthSettings] = useState(false);
+  const [showWeekSettings, setShowWeekSettings] = useState(false);
   const [calendarFilterDoctor, setCalendarFilterDoctor] = useState<string>('');
   const [calendarFilterGender, setCalendarFilterGender] = useState<string>('');
+
+  const monthSettings: MonthViewSettings = data.settings.monthViewSettings || {
+    fontSize: 12,
+    columnPadding: 20,
+    textColor: '#4b5563'
+  };
+
+  const weekSettings: WeekViewSettings = data.settings.weekViewSettings || {
+    fontSize: 14,
+    textColor: '#111827'
+  };
+
+  const updateMonthSettings = (newSettings: Partial<MonthViewSettings>) => {
+      if (!setData) return;
+      setData(prev => ({
+          ...prev,
+          lastUpdated: Date.now(),
+          settings: {
+              ...prev.settings,
+              monthViewSettings: { ...monthSettings, ...newSettings }
+          }
+      }));
+  };
+
+  const updateWeekSettings = (newSettings: Partial<WeekViewSettings>) => {
+      if (!setData) return;
+      setData(prev => ({
+          ...prev,
+          lastUpdated: Date.now(),
+          settings: {
+              ...prev.settings,
+              weekViewSettings: { ...weekSettings, ...newSettings }
+          }
+      }));
+  };
 
   const displayedAppointments = filteredAppointments.filter(appt => {
       const p = appt.patient;
@@ -50,6 +91,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       return true;
   });
 
+  // New Logic: columnPadding (0-150) translates to min-width (1000px - 2500px)
+  const calculateMinWidth = () => {
+      const base = 1000;
+      const multiplier = 10;
+      // Handle legacy small values (like 4) or new scaled values
+      const val = monthSettings.columnPadding < 100 ? monthSettings.columnPadding * 10 : monthSettings.columnPadding;
+      return base + (val * multiplier);
+  };
+
   return (
     <div className="w-full animate-fade-in pb-10">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
@@ -59,6 +109,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
          </div>
          
          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {calendarView === 'month' && (
+                <button 
+                    onClick={() => setShowMonthSettings(!showMonthSettings)}
+                    className={`p-2 rounded-lg border transition ${showMonthSettings ? 'bg-primary-50 text-primary-600 border-primary-200' : 'bg-white text-gray-500 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
+                    title={t.calendarSettings}
+                >
+                    <Settings size={20} />
+                </button>
+            )}
+
+            {calendarView === 'week' && (
+                <button 
+                    onClick={() => setShowWeekSettings(!showWeekSettings)}
+                    className={`p-2 rounded-lg border transition ${showWeekSettings ? 'bg-primary-50 text-primary-600 border-primary-200' : 'bg-white text-gray-500 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
+                    title={t.calendarSettings}
+                >
+                    <Settings size={20} />
+                </button>
+            )}
+
             <button 
                 onClick={() => setShowCalendarFilter(!showCalendarFilter)}
                 className={`p-2 rounded-lg border transition ${showCalendarFilter ? 'bg-primary-50 text-primary-600 border-primary-200' : 'bg-white text-gray-500 border-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300'}`}
@@ -94,7 +164,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 {(['month', 'week', 'day'] as const).map(v => (
                     <button
                         key={v}
-                        onClick={() => setCalendarView(v)}
+                        onClick={() => {
+                            setCalendarView(v);
+                            // Auto-close settings panels when switching views
+                            setShowMonthSettings(false);
+                            setShowWeekSettings(false);
+                        }}
                         className={`px-4 py-2 rounded-lg text-sm font-bold capitalize transition ${calendarView === v ? 'bg-white dark:bg-gray-600 shadow text-gray-800 dark:text-white' : 'text-gray-500'}`}
                     >
                         {t[v]}
@@ -103,6 +178,51 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             </div>
          </div>
       </div>
+
+      {showMonthSettings && calendarView === 'month' && (
+          <div className="mb-6 bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-xl animate-fade-in grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><TypeIcon size={14}/> {t.fontSize}</label>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min="8" max="24" value={monthSettings.fontSize} onChange={(e) => updateMonthSettings({ fontSize: parseInt(e.target.value) })} className="flex-1 accent-primary-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                    <span className="font-bold text-gray-700 dark:text-white w-8 text-center">{monthSettings.fontSize}</span>
+                  </div>
+              </div>
+              <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><Layout size={14}/> {t.columnPadding}</label>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min="0" max="150" step="5" value={monthSettings.columnPadding} onChange={(e) => updateMonthSettings({ columnPadding: parseInt(e.target.value) })} className="flex-1 accent-primary-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                    <span className="font-bold text-gray-700 dark:text-white w-8 text-center">{monthSettings.columnPadding}</span>
+                  </div>
+              </div>
+              <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> {t.textColor}</label>
+                  <div className="flex items-center gap-3">
+                      <input type="color" value={monthSettings.textColor} onChange={(e) => updateMonthSettings({ textColor: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer border-none bg-transparent" />
+                      <button onClick={() => updateMonthSettings({ textColor: '#4b5563' })} className="text-[10px] font-bold text-primary-600 hover:underline">{t.reset}</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {showWeekSettings && calendarView === 'week' && (
+          <div className="mb-6 bg-white dark:bg-gray-800 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-xl animate-fade-in grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl">
+              <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><TypeIcon size={14}/> {t.fontSize}</label>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min="10" max="24" value={weekSettings.fontSize} onChange={(e) => updateWeekSettings({ fontSize: parseInt(e.target.value) })} className="flex-1 accent-primary-600 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer" />
+                    <span className="font-bold text-gray-700 dark:text-white w-8 text-center">{weekSettings.fontSize}</span>
+                  </div>
+              </div>
+              <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2"><Palette size={14}/> {t.textColor}</label>
+                  <div className="flex items-center gap-3">
+                      <input type="color" value={weekSettings.textColor} onChange={(e) => updateWeekSettings({ textColor: e.target.value })} className="w-full h-8 rounded-lg cursor-pointer border-none bg-transparent" />
+                      <button onClick={() => updateWeekSettings({ textColor: '#111827' })} className="text-[10px] font-bold text-primary-600 hover:underline">{t.reset}</button>
+                  </div>
+              </div>
+          </div>
+      )}
 
       <div className="flex items-center justify-between mb-6 bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-4">
@@ -116,14 +236,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       </div>
 
       {calendarView === 'month' && (
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg border-2 border-gray-300 dark:border-gray-600 overflow-hidden flex flex-col">
               <div className="overflow-auto custom-scrollbar">
-                <div className="min-w-[1000px]">
-                    <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+                <div style={{ minWidth: `${calculateMinWidth()}px` }}>
+                    <div className="grid grid-cols-7 border-b-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50">
                         {Array.from({ length: 7 }).map((_, i) => {
                             const d = addDays(new Date(2024, 0, 7), i);
+                            const colColor = COLUMN_COLORS[i];
                             return (
-                                <div key={i} className="py-3 text-center text-sm font-bold text-gray-500">
+                                <div key={i} className={`py-4 text-center text-sm font-black text-gray-600 dark:text-gray-200 border-r-2 last:border-r-0 border-gray-300 dark:border-gray-600 ${colColor}`}>
                                     {getLocalizedDate(d, 'weekday', currentLang)}
                                 </div>
                             );
@@ -137,20 +258,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             const isToday = isSameDay(day, new Date());
                             const isCurrentMonth = isSameMonth(day, currentDate);
                             const dayAppointments = displayedAppointments.filter(a => isSameDay(new Date(a.date), day));
+                            const dayOfWeek = day.getDay();
+                            const colColor = COLUMN_COLORS[dayOfWeek];
                             
                             return (
                                 <div 
                                     key={idx} 
                                     onClick={() => { setCurrentDate(day); setCalendarView('day'); }}
-                                    className={`border-b border-r border-gray-100 dark:border-gray-700 p-2 transition hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer flex flex-col items-start gap-1 min-h-[140px] ${!isCurrentMonth ? 'bg-gray-50/50 dark:bg-gray-900/50' : ''}`}
+                                    className={`border-b-2 border-r-2 last:border-r-0 border-gray-300 dark:border-gray-600 p-3 transition hover:brightness-95 cursor-pointer flex flex-col items-start gap-1 min-h-[160px] ${colColor} ${!isCurrentMonth ? 'opacity-40 grayscale-[0.5]' : ''}`}
                                 >
-                                    <span className={`text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-primary-600 text-white' : isCurrentMonth ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
+                                    <span className={`text-sm font-black w-8 h-8 flex items-center justify-center rounded-full mb-1 ${isToday ? 'bg-primary-600 text-white shadow-lg' : 'text-gray-700 dark:text-gray-300'}`}>
                                         {format(day, 'd')}
                                     </span>
                                     
-                                    <div className="flex flex-col gap-0.5 w-full">
+                                    <div className="flex flex-col gap-1 w-full">
                                         {dayAppointments.map((appt, i) => (
-                                            <div key={i} className="text-[10px] text-gray-600 dark:text-gray-300 truncate w-full px-1 leading-tight bg-blue-50/50 dark:bg-blue-900/20 rounded-sm border-l-2 border-blue-400">
+                                            <div 
+                                                key={i} 
+                                                className="truncate w-full px-2 py-0.5 leading-tight bg-white/80 dark:bg-black/30 rounded-md border-s-4 border-primary-500 shadow-sm font-bold"
+                                                style={{ fontSize: `${monthSettings.fontSize}px`, color: monthSettings.textColor }}
+                                            >
                                                 {appt.patientName}
                                             </div>
                                         ))}
@@ -196,7 +323,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                               ) : (
                                   dayAppointments.map(appt => (
                                       <div key={appt.id} className="flex items-center justify-between bg-white/90 dark:bg-black/40 p-3 rounded-2xl shadow-sm border border-black/5 transition-transform hover:scale-[1.02]">
-                                          <span className="font-black text-sm text-gray-900 dark:text-white truncate flex-1 pr-2">{appt.patientName}</span>
+                                          <span 
+                                            className="font-black truncate flex-1 pr-2"
+                                            style={{ 
+                                                fontSize: `${weekSettings.fontSize}px`, 
+                                                color: weekSettings.textColor 
+                                            }}
+                                          >
+                                              {appt.patientName}
+                                          </span>
                                           <span className="text-[11px] font-black font-mono bg-primary-600 text-white dark:bg-primary-500 px-2 py-1 rounded-lg shrink-0 shadow-sm">
                                               {formatTime12(appt.time, currentLang)}
                                           </span>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Printer, Edit2, Trash2, DollarSign, Settings, X, Info } from 'lucide-react';
@@ -66,7 +65,7 @@ export const FinancialsSection: React.FC<FinancialsSectionProps> = ({
                     <div className="space-y-8">
                         {/* Currency Setting */}
                         <div>
-                            <label className="block text-2xl font-black text-gray-800 dark:text-gray-200 uppercase mb-3 tracking-widest">{t.language}</label>
+                            <label className="block text-2xl font-black text-gray-800 dark:text-gray-200 uppercase mb-3 tracking-widest">{t.currency}</label>
                             <select
                                 value={data.settings.currency}
                                 onChange={(e) => setCurrency(e.target.value)}

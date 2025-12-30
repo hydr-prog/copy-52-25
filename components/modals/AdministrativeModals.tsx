@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, ChevronDown } from 'lucide-react';
+import { X, ChevronDown, Search, User, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { COUNTRY_CODES, CATEGORIES, TREATMENT_TYPES, DURATIONS, STATUS_COLORS } from '../../constants';
 import { Patient, Appointment } from '../../types';
@@ -105,24 +105,57 @@ export const AppointmentModal = ({ show, onClose, t, selectedAppointment, appoin
     const fontClass = isRTL ? 'font-cairo' : 'font-sans';
 
     useEffect(() => {
-        if (!show) { setPatientSearch(''); setSelectedPatientIdForm(''); setShowPatientList(false); }
-        else { if(selectedAppointment) { setSelectedPatientIdForm(selectedAppointment.patientId); setPatientSearch(selectedAppointment.patientName); } }
-    }, [show, selectedAppointment]);
+        if (!show) { 
+          setPatientSearch(''); 
+          setSelectedPatientIdForm(''); 
+          setShowPatientList(false); 
+        } else { 
+          if(selectedAppointment) { 
+            setSelectedPatientIdForm(selectedAppointment.patientId); 
+            setPatientSearch(selectedAppointment.patientName); 
+          } else if (selectedPatientId) {
+            const p = data.patients.find((p: any) => p.id === selectedPatientId);
+            if (p) {
+              setSelectedPatientIdForm(p.id);
+              setPatientSearch(p.name);
+            }
+          }
+        }
+    }, [show, selectedAppointment, selectedPatientId, data.patients]);
 
-    useEffect(() => { if (show && !selectedAppointment) { setPatientSearch(''); setSelectedPatientIdForm(''); setShowPatientList(false); } }, [appointmentMode]);
+    useEffect(() => { 
+      if (show && !selectedAppointment && !selectedPatientId) { 
+        setPatientSearch(''); 
+        setSelectedPatientIdForm(''); 
+        setShowPatientList(false); 
+      } 
+    }, [appointmentMode, show, selectedAppointment, selectedPatientId]);
+
     if (!show) return null;
-    const filteredPatients = data.patients.filter((p: Patient) => p.name.toLowerCase().includes(patientSearch.toLowerCase()) || p.phone.includes(patientSearch) );
+    const filteredPatients = data.patients.filter((p: Patient) => 
+        p.name.toLowerCase().includes(patientSearch.toLowerCase()) || 
+        p.phone.includes(patientSearch) 
+    );
+
+    // Context determination: Is this a fixed patient (like from profile) or searchable?
+    // We treat it as searchable if we are adding a NEW appointment AND it wasn't opened from a specific profile
+    const isFixedContext = !!selectedAppointment || (!!selectedPatientId && appointmentMode === 'existing');
 
     return createPortal(
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
               <div className={`bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto ${fontClass}`} dir={isRTL ? 'rtl' : 'ltr'}>
-                  <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-4">{selectedAppointment ? t.editAppointment : t.addAppointment}</h3>
+                  <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-xl font-bold text-gray-800 dark:text-white">{selectedAppointment ? t.editAppointment : t.addAppointment}</h3>
+                      <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X size={20} className="text-gray-400" /></button>
+                  </div>
+
                   {!selectedAppointment && !selectedPatientId && (
-                      <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl mb-4">
-                          <button type="button" onClick={() => setAppointmentMode('existing')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${appointmentMode === 'existing' ? 'bg-white dark:bg-gray-600 shadow' : 'text-gray-500'}`}>{t.existingPatient}</button>
-                          <button type="button" onClick={() => setAppointmentMode('new')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${appointmentMode === 'new' ? 'bg-white dark:bg-gray-600 shadow' : 'text-gray-500'}`}>{t.quickNewPatient}</button>
+                      <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl mb-4 shadow-inner">
+                          <button type="button" onClick={() => setAppointmentMode('existing')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${appointmentMode === 'existing' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary-600' : 'text-gray-500'}`}>{t.existingPatient}</button>
+                          <button type="button" onClick={() => setAppointmentMode('new')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${appointmentMode === 'new' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary-600' : 'text-gray-500'}`}>{t.quickNewPatient}</button>
                       </div>
                   )}
+
                   <form onSubmit={(e) => {
                       e.preventDefault();
                       const fd = new FormData(e.currentTarget);
@@ -134,70 +167,132 @@ export const AppointmentModal = ({ show, onClose, t, selectedAppointment, appoin
                           sessionNumber: parseInt(fd.get('sessionNumber') as string) || 1,
                           notes: fd.get('notes') as string
                       };
-                      if (appointmentMode === 'new') { apptData.patientName = fd.get('guestName') as string; handleAddAppointment(null, apptData); }
-                      else { let pId = selectedPatientId || selectedPatientIdForm; if (!pId) { alert(isRTL ? "يرجى اختيار مريض" : "Please select a patient"); return; } handleAddAppointment(pId, apptData); }
-                  }} className="space-y-3">
-                      {appointmentMode === 'existing' ? ( !selectedPatientId && (
-                              <div className="relative" ref={searchRef}>
-                                  <label className="block text-xs font-bold text-gray-500 mb-1">{t.patients}</label>
+                      if (appointmentMode === 'new') { 
+                          apptData.patientName = fd.get('guestName') as string; 
+                          handleAddAppointment(null, apptData); 
+                      } else { 
+                          let pId = selectedPatientId || selectedPatientIdForm; 
+                          if (!pId) { 
+                              alert(isRTL ? "يرجى اختيار مريض من القائمة" : "Please select a patient from the list"); 
+                              return; 
+                          } 
+                          handleAddAppointment(pId, apptData); 
+                      }
+                  }} className="space-y-4">
+                      
+                      {appointmentMode === 'existing' ? (
+                          <div className="relative" ref={searchRef}>
+                              <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.patients}</label>
+                              
+                              {selectedPatientIdForm ? (
+                                  <div className="flex items-center justify-between p-3 bg-primary-50 dark:bg-primary-900/30 border-2 border-primary-200 dark:border-primary-800 rounded-xl animate-scale-up">
+                                      <div className="flex items-center gap-3">
+                                          <div className="w-10 h-10 bg-primary-600 text-white rounded-lg flex items-center justify-center shadow-md"><User size={20} /></div>
+                                          <div>
+                                              <div className="font-bold text-primary-900 dark:text-primary-100 leading-tight">{patientSearch}</div>
+                                              <div className="text-[10px] text-primary-600/70 font-bold uppercase">{t.selected}</div>
+                                          </div>
+                                      </div>
+                                      {!isFixedContext && (
+                                          <button 
+                                              type="button" 
+                                              onClick={() => { setSelectedPatientIdForm(''); setPatientSearch(''); setShowPatientList(false); }}
+                                              className="p-2 text-primary-400 hover:text-red-500 transition-colors"
+                                          >
+                                              <Trash2 size={18} />
+                                          </button>
+                                      )}
+                                  </div>
+                              ) : (
                                   <div className="relative">
-                                      <input type="text" value={patientSearch} onChange={(e) => { setPatientSearch(e.target.value); setSelectedPatientIdForm(''); setShowPatientList(true); }} onFocus={() => setShowPatientList(true)} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none pr-10" placeholder={t.searchPatients} required={!selectedPatientIdForm} autoComplete="off" />
+                                      <Search className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-4' : 'left-4'} text-gray-400`} size={20} />
+                                      <input 
+                                          type="text" 
+                                          value={patientSearch} 
+                                          onChange={(e) => { setPatientSearch(e.target.value); setShowPatientList(true); }} 
+                                          onFocus={() => setShowPatientList(true)} 
+                                          className={`w-full ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3.5 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 dark:text-white outline-none focus:border-primary-500 transition-all font-bold`} 
+                                          placeholder={t.searchPatients} 
+                                          required 
+                                          autoComplete="off" 
+                                      />
                                       {showPatientList && patientSearch && (
-                                         <div className="absolute top-full left-0 right-0 bg-white dark:bg-gray-800 border dark:border-gray-700 z-[110] max-h-40 overflow-y-auto rounded-xl shadow-lg mt-1">
-                                             {filteredPatients.length > 0 ? ( filteredPatients.map((p: Patient) => (
-                                                    <div key={p.id} className="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm dark:text-white border-b last:border-0 border-gray-50 dark:border-gray-700" onMouseDown={(e) => { e.preventDefault(); setPatientSearch(p.name); setSelectedPatientIdForm(p.id); setShowPatientList(false); }}>
-                                                        <div className="font-bold">{p.name}</div>
-                                                        <div className="text-gray-400 text-xs">{p.phone}</div>
-                                                    </div> ))
-                                             ) : ( <div className="p-3 text-sm text-gray-400 italic text-center">{t.noPatientsFilter}</div> )}
+                                         <div className="absolute top-full left-0 right-0 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 z-[110] max-h-48 overflow-y-auto rounded-xl shadow-2xl mt-2 animate-fade-in custom-scrollbar">
+                                             {filteredPatients.length > 0 ? ( 
+                                                filteredPatients.map((p: Patient) => (
+                                                    <div 
+                                                        key={p.id} 
+                                                        className="p-4 hover:bg-primary-50 dark:hover:bg-primary-900/20 cursor-pointer text-sm dark:text-white border-b last:border-0 border-gray-50 dark:border-gray-700 flex justify-between items-center group" 
+                                                        onMouseDown={(e) => { 
+                                                            e.preventDefault(); 
+                                                            setPatientSearch(p.name); 
+                                                            setSelectedPatientIdForm(p.id); 
+                                                            setShowPatientList(false); 
+                                                        }}
+                                                    >
+                                                        <div>
+                                                            <div className="font-black text-gray-800 dark:text-white group-hover:text-primary-600 transition-colors">{p.name}</div>
+                                                            <div className="text-gray-400 text-[10px] font-bold tracking-widest uppercase">{p.phone}</div>
+                                                        </div>
+                                                        <ChevronDown size={14} className="text-gray-300 group-hover:text-primary-400 -rotate-90" />
+                                                    </div> 
+                                                ))
+                                             ) : ( 
+                                                <div className="p-6 text-sm text-gray-400 italic text-center font-bold">{t.noPatientsFilter}</div> 
+                                             )}
                                          </div>
                                       )}
                                   </div>
-                              </div>
-                          )
+                              )}
+                          </div>
                       ) : (
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">{t.guestNamePlaceholder}</label>
-                              <input name="guestName" defaultValue={selectedAppointment?.patientName} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" required placeholder={t.guestNamePlaceholder} />
+                              <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.guestNamePlaceholder}</label>
+                              <input name="guestName" defaultValue={selectedAppointment?.patientName} className="w-full p-3.5 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 dark:text-white outline-none focus:border-primary-500 font-bold" required placeholder={t.guestNamePlaceholder} />
                           </div>
                       )}
-                      <div className="grid grid-cols-2 gap-3">
+
+                      <div className="grid grid-cols-2 gap-3 pt-2">
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">{t.date}</label>
-                              <input name="date" type="date" defaultValue={selectedAppointment?.date || format(currentDate, 'yyyy-MM-dd')} required className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" />
+                              <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.date}</label>
+                              <input name="date" type="date" defaultValue={selectedAppointment?.date || format(currentDate, 'yyyy-MM-dd')} required className="w-full p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white outline-none font-bold text-sm" />
                           </div>
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">{t.time}</label>
-                              <input name="time" type="time" defaultValue={selectedAppointment?.time || '09:00'} required className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" />
+                              <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.time}</label>
+                              <input name="time" type="time" defaultValue={selectedAppointment?.time || '09:00'} required className="w-full p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white outline-none font-bold text-sm" />
                           </div>
                       </div>
+
                       <div className="grid grid-cols-2 gap-3">
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">{t.treatmentType}</label>
-                              <select name="treatmentType" defaultValue={selectedAppointment?.treatmentType || 'diagnosis'} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none">
+                              <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.treatmentType}</label>
+                              <select name="treatmentType" defaultValue={selectedAppointment?.treatmentType || 'diagnosis'} className="w-full p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white outline-none font-bold text-sm">
                                   {TREATMENT_TYPES.map(type => ( <option key={type.id} value={type.id}>{currentLang === 'ku' ? type.ku : (currentLang === 'ar' ? type.ar : type.en)}</option> ))}
                               </select>
                           </div>
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 mb-1">{t.duration}</label>
-                              <select name="duration" defaultValue={selectedAppointment?.duration || 30} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none">
+                              <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.duration}</label>
+                              <select name="duration" defaultValue={selectedAppointment?.duration || 30} className="w-full p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white outline-none font-bold text-sm">
                                   {DURATIONS.map(d => <option key={d} value={d}>{d} {t.min}</option>)}
                               </select>
                           </div>
                       </div>
+
                       <div className="flex gap-3">
                           <div className="flex-1">
-                              <label className="block text-xs font-bold text-gray-500 mb-1">{t.sessionNumber}</label>
-                              <input name="sessionNumber" type="number" min="1" defaultValue={selectedAppointment?.sessionNumber || 1} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" />
+                              <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.sessionNumber}</label>
+                              <input name="sessionNumber" type="number" min="1" defaultValue={selectedAppointment?.sessionNumber || 1} className="w-full p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white outline-none font-bold text-sm" />
                           </div>
                       </div>
+
                       <div>
-                          <label className="block text-xs font-bold text-gray-500 mb-1">{t.notes}</label>
-                          <textarea name="notes" defaultValue={selectedAppointment?.notes} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" placeholder={t.optionalNotesPlaceholder} rows={2} />
+                          <label className="block text-xs font-black text-gray-400 uppercase mb-1 tracking-widest">{t.notes}</label>
+                          <textarea name="notes" defaultValue={selectedAppointment?.notes} className="w-full p-3 rounded-xl border-2 border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-700 dark:text-white outline-none font-medium text-sm shadow-inner" placeholder={t.optionalNotesPlaceholder} rows={2} />
                       </div>
-                      <div className="flex gap-2 pt-2">
-                          <button type="button" onClick={onClose} className="flex-1 py-3 text-gray-500 font-bold hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl">{t.cancel}</button>
-                          <button type="submit" className="flex-1 py-3 bg-primary-600 text-white font-bold rounded-xl shadow-lg hover:bg-primary-700">{t.save}</button>
+
+                      <div className="flex gap-3 pt-4">
+                          <button type="button" onClick={onClose} className="flex-1 py-4 text-gray-500 dark:text-gray-400 font-black uppercase tracking-widest text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-all">{t.cancel}</button>
+                          <button type="submit" className="flex-2 py-4 bg-primary-600 text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-xl shadow-primary-500/30 hover:bg-primary-700 transition-all transform active:scale-95">{t.save}</button>
                       </div>
                   </form>
               </div>

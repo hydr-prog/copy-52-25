@@ -1,3 +1,4 @@
+
 {
   "short_name": "Dentro",
   "name": "Dentro Clinic App",
@@ -17,7 +18,7 @@
   ],
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "theme_color": "#4f46e5",
   "background_color": "#ffffff"
 }

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Filter, MessageCircle, Phone, ArrowUpDown, ChevronLeft, ChevronRight, CalendarPlus, LayoutGrid, List } from 'lucide-react';
 import { CATEGORIES, STATUS_COLORS } from '../constants';
-import { getLocalizedDate } from '../utils';
+import { getLocalizedDate, openWhatsApp } from '../utils';
 import { ClinicData, Patient } from '../types';
 
 interface PatientsViewProps {
@@ -111,16 +111,13 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
         >
             <CalendarPlus size={18} />
         </button>
-        <a 
-            href={`https://wa.me/${patient.phoneCode?.replace('+','')}${patient.phone.replace(/\s/g, '')}`}
-            target="_blank" 
-            rel="noreferrer"
+        <button 
+            onClick={(e) => { e.stopPropagation(); openWhatsApp(patient.phoneCode, patient.phone); }}
             className="p-2.5 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-xl transition shadow-sm"
             title={t.contactWhatsapp}
-            onClick={(e) => e.stopPropagation()}
         >
             <MessageCircle size={18} />
-        </a>
+        </button>
         <a 
             href={`tel:${patient.phoneCode?.replace('+','')}${patient.phone.replace(/\s/g, '')}`}
             className="p-2.5 bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-xl transition shadow-sm"
@@ -212,7 +209,7 @@ export const PatientsView: React.FC<PatientsViewProps> = ({
              <select 
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="h-full ps-10 pe-8 py-4 rounded-xl shadow-sm border-none bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold outline-none cursor-pointer appearance-none"
+                className="h-full ps-10 pe-8 py-4 rounded-xl shadow-sm border-none bg-white dark:bg-gray-800 text-gray-700 dark:text-300 font-bold outline-none cursor-pointer appearance-none"
              >
                  <option value="name">{t.sortName}</option>
                  <option value="newest">{t.sortNewest}</option>

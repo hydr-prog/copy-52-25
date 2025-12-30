@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Activity, Globe, ArrowRight, Instagram, CheckCircle2, ChevronDown, User, Grid, Calendar, DollarSign, FlaskConical, FileText, BarChart3, Cloud, LayoutDashboard, StickyNote, ShoppingBag, PlusCircle, Sparkles, MonitorSmartphone, Palette, UsersRound, X, Database, Paintbrush, ShieldCheck, UserCog, Contact, Image as ImageIcon, Shield } from 'lucide-react';
+import { Activity, Globe, ArrowRight, Instagram, CheckCircle2, ChevronDown, User, Grid, Calendar, DollarSign, FlaskConical, FileText, BarChart3, Cloud, LayoutDashboard, StickyNote, ShoppingBag, PlusCircle, Sparkles, MonitorSmartphone, Palette, UsersRound, X, Database, Paintbrush, ShieldCheck, UserCog, Contact, Image as ImageIcon, Shield, BrainCircuit } from 'lucide-react';
 import { PRICING_PLANS } from '../constants';
 import { LABELS } from '../locales';
 import { Logo } from './Logo';
@@ -97,6 +97,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setAppState, landingLa
   const currentModalText = modalTexts[landingLang];
 
   const FEATURES = [
+      { icon: BrainCircuit, title: t.featureAI, desc: t.featureAIDesc, color: 'text-indigo-700', bg: 'bg-indigo-100 dark:bg-indigo-900/40' },
       { icon: ShieldCheck, title: t.featureMainAccount, desc: t.featureMainAccountDesc, color: 'text-indigo-600', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
       { icon: UserCog, title: t.featureDoctorProfile, desc: t.featureDoctorProfileDesc, color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
       { icon: Contact, title: t.featureSecretaryAccount, desc: t.featureSecretaryAccountDesc, color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30' },
@@ -113,7 +114,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setAppState, landingLa
       { icon: BarChart3, title: t.featureDashboard, desc: t.featureDashboardDesc, color: 'text-indigo-500', bg: 'bg-indigo-100 dark:bg-indigo-900/30' },
       { icon: Cloud, title: t.featureCloud, desc: t.featureCloudDesc, color: 'text-orange-500', bg: 'bg-orange-100 dark:bg-orange-900/30' },
       
-      // New Features
       { icon: UsersRound, title: t.featureMultiDoctor, desc: t.featureMultiDoctorDesc, color: 'text-red-500', bg: 'bg-red-100 dark:bg-red-900/30' },
       { icon: MonitorSmartphone, title: t.featureMultiDevice, desc: t.featureMultiDeviceDesc, color: 'text-teal-500', bg: 'bg-teal-100 dark:bg-teal-900/30' },
       { icon: Palette, title: t.featureProDesigns, desc: t.featureProDesignsDesc, color: 'text-fuchsia-500', bg: 'bg-fuchsia-100 dark:bg-fuchsia-900/30' },
@@ -205,7 +205,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setAppState, landingLa
                 <span className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white tracking-tight">Dentro</span>
             </div>
             <div className="flex gap-2 md:gap-4 items-center shrink-0">
-                {/* Click-based Dropdown */}
                 <div className="relative group" ref={langMenuRef}>
                     <button 
                         onClick={(e) => {
@@ -244,7 +243,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setAppState, landingLa
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                 </span>
-                <span>{t.landingTitle} v2.2</span>
+                <span>{t.landingTitle} v3.7</span>
             </div>
             <h1 className="text-3xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-700 to-secondary-600 dark:from-white dark:to-gray-300 mb-6 !leading-tight md:!leading-relaxed max-w-4xl py-2">
                 {t.manageClinicSlogan}
@@ -296,7 +295,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setAppState, landingLa
             <div className="text-center mb-12">
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">{t.pricing}</h2>
                 
-                {/* New Promo Text */}
                 <div className="flex flex-col gap-2 mb-6">
                     <span className="text-secondary-600 dark:text-secondary-400 font-bold text-lg animate-pulse">
                         {landingLang === 'ar' ? "نسخة تجريبية مجانية لمدة اسبوع" : landingLang === 'ku' ? "تاقیکردنەوەی بێ بەرامبەر بۆ ماوەی هەفتەیەک" : "Free trial for one week"}
@@ -314,15 +312,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setAppState, landingLa
                     const isBestValue = plan.id === '1yr';
                     
                     if (isBestValue) {
-                        // Annual Plan - Black Background & Thicker Animated Border
                         return (
                             <div key={plan.id} className="relative group z-10 transform hover:-translate-y-2 transition-transform duration-300">
-                                {/* Thicker Animated Gradient Border (-inset-[4px]) */}
                                 <div className="absolute -inset-[4px] bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600 rounded-3xl animate-border-gradient opacity-100 shadow-xl shadow-purple-500/30"></div>
                                 
-                                {/* Inner Black Card */}
                                 <div className="relative h-full bg-black rounded-[22px] p-6 flex flex-col overflow-hidden">
-                                    {/* Best Value Badge */}
                                     <div className="absolute top-0 right-0 bg-gradient-to-l from-purple-600 to-pink-600 text-white text-xs font-bold px-4 py-1.5 rounded-bl-xl shadow-lg z-20">
                                         {t.bestValue}
                                     </div>
@@ -357,7 +351,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ setAppState, landingLa
                             </div>
                         );
                     } else {
-                        // Other Plans - Black Background with Thicker Blue Border (border-4) & Green Checks
                         return (
                             <div 
                                 key={plan.id} 

@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { ArrowLeft, Edit2, Trash2, Phone, Copy, MessageCircle, Camera, BrainCircuit } from 'lucide-react';
 import { STATUS_COLORS, CATEGORIES } from '../../constants';
+import { openWhatsApp } from '../../utils';
 import { Patient, Language } from '../../types';
 
 interface PatientHeaderProps {
@@ -81,7 +83,12 @@ export const PatientHeader: React.FC<PatientHeaderProps> = ({
                     </span>
                 </div>
                 <span className="hidden md:inline">•</span>
-                <a href={`https://wa.me/${activePatient.phoneCode?.replace('+','')}${activePatient.phone.replace(/\s/g, '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-green-600 hover:underline"><MessageCircle size={14} /> {t.whatsapp}</a>
+                <button 
+                    onClick={() => openWhatsApp(activePatient.phoneCode, activePatient.phone)} 
+                    className="flex items-center gap-1 text-green-600 hover:underline"
+                >
+                    <MessageCircle size={14} /> {t.whatsapp}
+                </button>
                 <span className="hidden md:inline">•</span>
                 <a href={`tel:${activePatient.phoneCode?.replace('+','')}${activePatient.phone.replace(/\s/g, '')}`} className="flex items-center gap-1 text-blue-600 hover:underline"><Phone size={14} /> {t.call}</a>
             </div>
