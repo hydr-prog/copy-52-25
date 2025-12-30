@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Filter, ChevronLeft, ChevronRight, Users, Plus, Check, X as XIcon, History, Trash2, Settings, Type as TypeIcon, Layout, Palette } from 'lucide-react';
 import { addMonths, addWeeks, addDays, endOfWeek, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, format } from 'date-fns';
 import { getLocalizedDate, formatTime12, getTreatmentLabel } from '../utils';
@@ -30,7 +30,6 @@ interface CalendarViewProps {
   setData?: React.Dispatch<React.SetStateAction<ClinicData>>;
 }
 
-// Updated: All columns are now white/transparent to look cleaner with borders
 const COLUMN_COLORS = Array(7).fill('bg-white dark:bg-gray-800/40');
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -45,39 +44,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [calendarFilterDoctor, setCalendarFilterDoctor] = useState<string>('');
   const [calendarFilterGender, setCalendarFilterGender] = useState<string>('');
 
-  const monthSettings: MonthViewSettings = data.settings.monthViewSettings || {
-    fontSize: 12,
-    columnPadding: 20,
-    textColor: '#4b5563'
-  };
+  // Local device-only state for settings
+  const [monthSettings, setMonthSettings] = useState<MonthViewSettings>(() => {
+    const saved = localStorage.getItem('dentro_cal_month_settings');
+    if (saved) return JSON.parse(saved);
+    return data.settings.monthViewSettings || { fontSize: 12, columnPadding: 20, textColor: '#4b5563' };
+  });
 
-  const weekSettings: WeekViewSettings = data.settings.weekViewSettings || {
-    fontSize: 14,
-    textColor: '#111827'
-  };
+  const [weekSettings, setWeekSettings] = useState<WeekViewSettings>(() => {
+    const saved = localStorage.getItem('dentro_cal_week_settings');
+    if (saved) return JSON.parse(saved);
+    return data.settings.weekViewSettings || { fontSize: 14, textColor: '#111827' };
+  });
 
   const updateMonthSettings = (newSettings: Partial<MonthViewSettings>) => {
-      if (!setData) return;
-      setData(prev => ({
-          ...prev,
-          lastUpdated: Date.now(),
-          settings: {
-              ...prev.settings,
-              monthViewSettings: { ...monthSettings, ...newSettings }
-          }
-      }));
+      const updated = { ...monthSettings, ...newSettings };
+      setMonthSettings(updated);
+      localStorage.setItem('dentro_cal_month_settings', JSON.stringify(updated));
   };
 
   const updateWeekSettings = (newSettings: Partial<WeekViewSettings>) => {
-      if (!setData) return;
-      setData(prev => ({
-          ...prev,
-          lastUpdated: Date.now(),
-          settings: {
-              ...prev.settings,
-              weekViewSettings: { ...weekSettings, ...newSettings }
-          }
-      }));
+      const updated = { ...weekSettings, ...newSettings };
+      setWeekSettings(updated);
+      localStorage.setItem('dentro_cal_week_settings', JSON.stringify(updated));
   };
 
   const displayedAppointments = filteredAppointments.filter(appt => {
@@ -91,11 +80,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       return true;
   });
 
-  // New Logic: columnPadding (0-150) translates to min-width (1000px - 2500px)
   const calculateMinWidth = () => {
       const base = 1000;
       const multiplier = 10;
-      // Handle legacy small values (like 4) or new scaled values
       const val = monthSettings.columnPadding < 100 ? monthSettings.columnPadding * 10 : monthSettings.columnPadding;
       return base + (val * multiplier);
   };
@@ -108,7 +95,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
            <p className="text-gray-500 dark:text-gray-400 mt-1">{t.manageCalendar}</p>
          </div>
          
-         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+         <div className="flex flex-wrap items-center gap-3 w-full lg:auto">
             {calendarView === 'month' && (
                 <button 
                     onClick={() => setShowMonthSettings(!showMonthSettings)}
@@ -166,7 +153,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                         key={v}
                         onClick={() => {
                             setCalendarView(v);
-                            // Auto-close settings panels when switching views
                             setShowMonthSettings(false);
                             setShowWeekSettings(false);
                         }}
@@ -369,7 +355,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
               <button 
                 onClick={() => {
                     setSelectedAppointment(null);
-                    setAppointmentMode('existing'); // Default to existing but modal shows toggle
+                    setAppointmentMode('existing');
                     setShowAppointmentModal(true);
                 }}
                 className="w-full py-4 bg-primary-50 dark:bg-gray-700 border-2 border-dashed border-primary-200 dark:border-gray-600 rounded-2xl text-primary-600 dark:text-primary-300 font-bold hover:bg-primary-100 dark:hover:bg-gray-600 transition flex items-center justify-center gap-2"
