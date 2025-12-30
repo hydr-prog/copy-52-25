@@ -76,7 +76,6 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
-      // scrollIntoView will move the viewport to the element
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
@@ -94,16 +93,33 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
       const adminPass = data.settings.adminPassword || '123456';
       if (passwordInput === adminPass) {
           const action = pendingAction;
-          setShowVerificationModal(false); setVerifyError('');
-          if (!action) { setShowChangeAdminPassModal(true); return; }
-          if (action.target === 'doctor') {
-              if (action.type === 'edit') { setFormDoc({ id: action.data.id, name: action.data.name, user: action.data.username || '', pass: action.data.password || '' }); setShowEditDoctorModal(true); }
-              else if (action.type === 'delete') { setShowDoctorDeleteChoice(true); }
-          } else if (action.target === 'secretary') {
-              if (action.type === 'delete') { openConfirm(t.deleteSecretary, isRTL ? `هل أنت متأكد من حذف حساب ${action.data.name}؟` : `Delete ${action.data.name}?`, () => handleDeleteSecretary(action.data.id)); }
+          setShowVerificationModal(false); 
+          setVerifyError('');
+          
+          if (!action) { 
+              setShowChangeAdminPassModal(true); 
+              return; 
           }
-          setPendingAction(null);
-      } else { setVerifyError(t.wrongPin); }
+
+          if (action.target === 'doctor') {
+              if (action.type === 'edit') { 
+                  setFormDoc({ id: action.data.id, name: action.data.name, user: action.data.username || '', pass: action.data.password || '' }); 
+                  setShowEditDoctorModal(true); 
+                  setPendingAction(null); 
+              }
+              else if (action.type === 'delete') { 
+                  setShowDoctorDeleteChoice(true); 
+                  // نترك pendingAction كما هو لأنه مطلوب في handleDoctorDeleteFinal
+              }
+          } else if (action.target === 'secretary') {
+              if (action.type === 'delete') { 
+                  openConfirm(t.deleteSecretary, isRTL ? `هل أنت متأكد من حذف حساب ${action.data.name}؟` : `Delete ${action.data.name}?`, () => handleDeleteSecretary(action.data.id)); 
+                  setPendingAction(null);
+              }
+          }
+      } else { 
+          setVerifyError(t.wrongPin); 
+      }
   };
 
   const saveAdminPassword = (newPass: string) => {
@@ -112,7 +128,11 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
   };
 
   const handleDoctorDeleteFinal = (deletePatients: boolean) => {
-      if (pendingAction?.data) { handleDeleteDoctor(pendingAction.data.id, deletePatients); setShowDoctorDeleteChoice(false); setPendingAction(null); }
+      if (pendingAction?.data) { 
+          handleDeleteDoctor(pendingAction.data.id, deletePatients); 
+          setShowDoctorDeleteChoice(false); 
+          setPendingAction(null); 
+      }
   };
 
   const handleBulkSyncToDrive = async () => {
@@ -204,7 +224,6 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
             </div>
         </div>
 
-        {/* Dashboard Grid Navigation - Centered and NARROW (max-w-4xl) to match sections below */}
         <div className="mb-16 flex justify-center w-full px-2 md:px-0">
              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6 w-full max-w-4xl">
                   {navItems.map((item) => (
@@ -256,7 +275,6 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
           )}
         </div>
 
-        {/* Floating Quick Action Button to jump back to top */}
         <button 
            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
            className="fixed bottom-8 end-8 p-4 bg-primary-600 dark:bg-white text-white dark:text-gray-900 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all z-50 md:hidden"
