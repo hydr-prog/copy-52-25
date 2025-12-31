@@ -64,7 +64,7 @@ const DebtorsModal = ({ isOpen, onClose, t, debtors, onSelectPatient, currency, 
                             <button 
                                 key={d.id}
                                 onClick={() => onSelectPatient(d.id)}
-                                className="w-full flex items-center justify-between p-5 bg-white dark:bg-gray-700 rounded-2xl border border-gray-100 dark:border-gray-600 hover:border-primary-300 hover:shadow-md transition-all group"
+                                className="w-full flex items-center justify-between p-5 bg-white dark:bg-gray-700 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-primary-300 hover:shadow-md transition-all group"
                             >
                                 <div className="text-start">
                                     <div className="font-black text-gray-800 dark:text-white text-lg group-hover:text-primary-600 transition-colors">{d.name}</div>
@@ -393,12 +393,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t, data, allAppoin
                  <h3 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{t.locked}</h3>
                  <p className="text-gray-500 text-sm mb-6">{t.unlockToView}</p>
                  <form onSubmit={handleUnlock}>
+                     {/* Bypassing password manager with text type + secure-input-field class */}
                      <input 
-                        type="password" maxLength={6} value={pinInput}
+                        type="text" maxLength={6} value={pinInput}
                         onChange={(e) => setPinInput(e.target.value)}
                         placeholder="• • • • • •"
-                        className="w-full text-center text-2xl tracking-[0.5em] font-bold p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none focus:border-primary-500 mb-4"
+                        className="w-full text-center text-2xl tracking-[0.5em] font-bold p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none focus:border-primary-500 mb-4 secure-input-field"
                         autoFocus
+                        autoComplete="off"
                      />
                      {errorMsg && <p className="text-red-500 text-sm font-bold mb-4">{errorMsg}</p>}
                      <button type="submit" className="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl shadow-lg transition">{t.done}</button>
@@ -421,11 +423,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t, data, allAppoin
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">{t.oldPin}</label>
-                                <input type="password" maxLength={6} value={oldPinInput} onChange={(e) => setOldPinInput(e.target.value)} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" />
+                                <input type="text" maxLength={6} value={oldPinInput} onChange={(e) => setOldPinInput(e.target.value)} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none secure-input-field" autoComplete="off" />
                             </div>
                             <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
                                 <label className="block text-xs font-bold text-gray-500 mb-1">{t.newPin} (Optional for remove)</label>
-                                <input type="password" maxLength={6} value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" />
+                                <input type="text" maxLength={6} value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none secure-input-field" autoComplete="off" />
                             </div>
                             {errorMsg && <p className="text-red-500 text-sm font-bold">{errorMsg}</p>}
                             <div className="flex gap-2">
@@ -437,7 +439,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ t, data, allAppoin
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">{t.setPin}</label>
-                                <input type="password" maxLength={6} value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none text-center text-xl tracking-widest" placeholder="######" />
+                                <input type="text" maxLength={6} value={pinInput} onChange={(e) => setPinInput(e.target.value)} className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none text-center text-xl tracking-widest secure-input-field" placeholder="######" autoComplete="off" />
                             </div>
                             {errorMsg && <p className="text-red-500 text-sm font-bold">{errorMsg}</p>}
                             <button onClick={handleSetPin} className="w-full py-3 bg-primary-600 text-white rounded-xl font-bold shadow-lg hover:bg-primary-700 transition">{t.save}</button>

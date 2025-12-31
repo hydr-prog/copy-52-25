@@ -30,7 +30,6 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({
       setError('');
       
       if (selectedProfile === 'admin') {
-          // Compare against stored admin password, default to '123456' if not set
           const adminPass = data.settings.adminPassword || '123456';
           if (passwordInput === adminPass) {
               onSelectAdmin(passwordInput);
@@ -172,12 +171,14 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({
                             </label>
                             <div className="relative">
                                 <Lock className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-400" size={18} />
+                                {/* Using type="text" with secure-input-field class to bypass password managers */}
                                 <input 
-                                    type="password" 
+                                    type="text" 
                                     value={passwordInput}
                                     onChange={(e) => setPasswordInput(e.target.value)}
-                                    className="w-full ps-10 pe-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                                    className="w-full ps-10 pe-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 secure-input-field"
                                     placeholder="••••••••"
+                                    autoComplete="new-password"
                                     autoFocus
                                     required
                                 />

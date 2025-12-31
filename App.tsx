@@ -147,10 +147,21 @@ export default function App() {
             const savedDocId = localStorage.getItem('dentro_active_profile');
             const savedSecId = localStorage.getItem('dentro_active_secretary');
 
-            if (savedProfileType === 'doctor' && savedDocId) setActiveDoctorId(savedDocId);
-            else if (savedProfileType === 'secretary' && savedSecId) setActiveSecretaryId(savedSecId);
-            
-            setAppState('profile_select');
+            // NEW: Skip profile selection if a session already exists
+            if (savedProfileType === 'doctor' && savedDocId) {
+                setActiveDoctorId(savedDocId);
+                setAppState('app');
+            } else if (savedProfileType === 'secretary' && savedSecId) {
+                setActiveSecretaryId(savedSecId);
+                setAppState('app');
+                setCurrentView('patients');
+            } else if (savedProfileType === 'admin') {
+                setActiveDoctorId(null);
+                setActiveSecretaryId(null);
+                setAppState('app');
+            } else {
+                setAppState('profile_select');
+            }
           } else {
             setAppState('app');
           }
@@ -335,9 +346,31 @@ export default function App() {
   };
 
   const handleProfileSelection = (type: 'admin' | 'doctor' | 'secretary', id?: string) => {
-      if (type === 'admin') { setActiveDoctorId(null); setActiveSecretaryId(null); localStorage.setItem('dentro_profile_type', 'admin'); localStorage.removeItem('dentro_active_profile'); localStorage.removeItem('dentro_active_secretary'); setAppState('app'); }
-      else if (type === 'doctor' && id) { setActiveDoctorId(id); setActiveSecretaryId(null); localStorage.setItem('dentro_profile_type', 'doctor'); localStorage.setItem('dentro_active_profile', id); localStorage.removeItem('dentro_active_secretary'); setAppState('app'); }
-      else if (type === 'secretary' && id) { setActiveSecretaryId(id); setActiveDoctorId(null); localStorage.setItem('dentro_profile_type', 'secretary'); localStorage.setItem('dentro_active_secretary', id); localStorage.removeItem('dentro_active_profile'); setAppState('app'); setCurrentView('patients'); }
+      if (type === 'admin') { 
+          setActiveDoctorId(null); 
+          setActiveSecretaryId(null); 
+          localStorage.setItem('dentro_profile_type', 'admin'); 
+          localStorage.removeItem('dentro_active_profile'); 
+          localStorage.removeItem('dentro_active_secretary'); 
+          setAppState('app'); 
+      }
+      else if (type === 'doctor' && id) { 
+          setActiveDoctorId(id); 
+          setActiveSecretaryId(null); 
+          localStorage.setItem('dentro_profile_type', 'doctor'); 
+          localStorage.setItem('dentro_active_profile', id); 
+          localStorage.removeItem('dentro_active_secretary'); 
+          setAppState('app'); 
+      }
+      else if (type === 'secretary' && id) { 
+          setActiveSecretaryId(id); 
+          setActiveDoctorId(null); 
+          localStorage.setItem('dentro_profile_type', 'secretary'); 
+          localStorage.setItem('dentro_active_secretary', id); 
+          localStorage.removeItem('dentro_active_profile'); 
+          setAppState('app'); 
+          setCurrentView('patients'); 
+      }
   };
 
   const handleClinicNameSubmit = (name: string) => { updateLocalData(prev => ({ ...prev, clinicName: name })); setAppState('profile_select'); };
@@ -359,7 +392,19 @@ export default function App() {
     setAppState('landing'); 
   };
 
-  const handleLogout = async () => { if (activeDoctorId || activeSecretaryId || (!activeDoctorId && !activeSecretaryId && data.clinicName)) { setActiveDoctorId(null); setActiveSecretaryId(null); localStorage.removeItem('dentro_profile_type'); localStorage.removeItem('dentro_active_profile'); localStorage.removeItem('dentro_active_secretary'); setAppState('profile_select'); return; } await performFullLogout(); };
+  const handleLogout = async () => { 
+      // This logout takes the user to the profile selector to switch accounts
+      if (activeDoctorId || activeSecretaryId || (!activeDoctorId && !activeSecretaryId && data.clinicName)) { 
+          setActiveDoctorId(null); 
+          setActiveSecretaryId(null); 
+          localStorage.removeItem('dentro_profile_type'); 
+          localStorage.removeItem('dentro_active_profile'); 
+          localStorage.removeItem('dentro_active_secretary'); 
+          setAppState('profile_select'); 
+          return; 
+      } 
+      await performFullLogout(); 
+  };
 
   const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'merge' | 'replace') => {
     if (e.target.files?.[0]) {
