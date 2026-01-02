@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud, Wifi, ArrowRight, LogIn, Download } from 'lucide-react';
+import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud } from 'lucide-react';
 import { ClinicData, Doctor, Secretary, Patient, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle, Examination } from './types';
 import { INITIAL_DATA } from './initialData';
 import { LABELS } from './locales';
@@ -24,17 +25,14 @@ import { LabOrdersView } from './components/LabOrdersView';
 import { PrintLayouts } from './components/PrintLayouts';
 import { SupplyModal, MemoModal, PatientModal, PaymentModal, AppointmentModal, AddMasterDrugModal, ExpenseModal, LabOrderModal, InventoryModal } from './components/AppModals';
 import { ProfileSelector } from './components/ProfileSelector';
-import { isSameDay, isSameWeek, isSameMonth, addDays, differenceInDays } from 'date-fns';
+import { isSameDay, isSameWeek, isSameMonth, addDays } from 'date-fns';
 import { Logo } from './components/Logo';
 import { THEMES } from './constants';
 import { hexToRgb } from './utils';
 
-const OFFLINE_LIMIT_DAYS = 3;
-
 export default function App() {
   const [data, setData] = useState<ClinicData>(INITIAL_DATA);
-  const [appState, setAppState] = useState<'landing' | 'auth' | 'profile_select' | 'app' | 'loading' | 'offline_prompt'>('loading');
-  const [offlineStatus, setOfflineStatus] = useState<'idle' | 'prompting' | 'blocked' | 'login_required'>('idle');
+  const [appState, setAppState] = useState<'landing' | 'auth' | 'profile_select' | 'app' | 'loading'>('loading');
   const [onboardingStep, setOnboardingStep] = useState(0); 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState('');
@@ -96,23 +94,12 @@ export default function App() {
   });
   const [activeThemeId, setActiveThemeId] = useState<string>(() => localStorage.getItem('dentro_theme_id') || 'classic');
 
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, []);
-
+  // Improved Updater that commits to LocalStorage immediately
   const updateLocalData = (updater: (prev: ClinicData) => ClinicData) => {
       setData(prev => {
           const next = updater(prev);
-          const updatedNext = { 
-            ...next, 
-            lastUpdated: Date.now() 
-          };
+          const updatedNext = { ...next, lastUpdated: isInitialLoading ? prev.lastUpdated : Date.now() };
+          // Persist to disk instantly to prevent race conditions during cloud polling
           storageService.saveData(updatedNext);
           return updatedNext;
       });
@@ -130,128 +117,12 @@ export default function App() {
       };
   };
 
-  const handleManualSync = async (force: boolean = false) => {
-      if (!navigator.onLine || !data.settings.isLoggedIn || (syncStatus === 'syncing' && !force)) return;
-      setSyncStatus('syncing');
-      try {
-          const cloudData = await supabaseService.loadData();
-          if (cloudData) {
-              const localData = storageService.loadData();
-              const cloudTimestamp = cloudData.lastUpdated || 0;
-              const localTimestamp = localData?.lastUpdated || 0;
-
-              if (cloudTimestamp > localTimestamp) {
-                  const merged = mergeDataWithLocalPrefs(cloudData);
-                  setData(merged); 
-                  storageService.saveData(merged); 
-                  setSyncStatus('synced'); 
-                  localStorage.setItem('dentro_last_online_sync', Date.now().toString());
-                  return true;
-              } else if (localTimestamp > cloudTimestamp) {
-                  await supabaseService.saveData(data);
-                  setSyncStatus('synced');
-                  localStorage.setItem('dentro_last_online_sync', Date.now().toString());
-                  return true;
-              }
-          }
-          setSyncStatus('synced'); 
-          return true;
-      } catch (e) { 
-          setSyncStatus('error'); 
-          return false; 
-      }
-  };
-
-  const forceSyncToCloud = async (overrideData?: ClinicData) => {
-      const dataToSave = overrideData || data;
-      if (!navigator.onLine || !dataToSave.settings.isLoggedIn) return;
-      setSyncStatus('syncing');
-      try {
-          await supabaseService.saveData(dataToSave); 
-          setSyncStatus('synced');
-          localStorage.setItem('dentro_last_online_sync', Date.now().toString());
-          setData(prev => ({ ...prev, lastSynced: new Date().toISOString() }));
-      } catch (e) { setSyncStatus('error'); }
-  };
-
-  const checkOfflineCondition = () => {
-    const lastSync = localStorage.getItem('dentro_last_online_sync');
-    if (!lastSync) return false;
-    const diff = differenceInDays(new Date(), new Date(parseInt(lastSync)));
-    return diff < OFFLINE_LIMIT_DAYS;
-  };
-
-  const handleContinueOffline = () => {
-    if (checkOfflineCondition()) {
-        setAppState('profile_select');
-        finalizeBoot();
-    } else {
-        setOfflineStatus('blocked');
-    }
-  };
-
-  const finalizeBoot = () => {
-    const currentData = storageService.loadData();
-    if (currentData && currentData.clinicName) {
-      const savedProfileType = localStorage.getItem('dentro_profile_type');
-      const savedDocId = localStorage.getItem('dentro_active_profile');
-      const savedSecId = localStorage.getItem('dentro_active_secretary');
-
-      if (savedProfileType === 'doctor' && savedDocId) {
-          setActiveDoctorId(savedDocId);
-          setAppState('app');
-      } else if (savedProfileType === 'secretary' && savedSecId) {
-          setActiveSecretaryId(savedSecId);
-          setAppState('app');
-          setCurrentView('patients');
-      } else if (savedProfileType === 'admin') {
-          setActiveDoctorId(null);
-          setActiveSecretaryId(null);
-          setAppState('app');
-      } else {
-          setAppState('profile_select');
-      }
-    } else {
-      setAppState('app');
-    }
-    setIsInitialLoading(false);
-  };
-
-  useEffect(() => {
-    const handleOnline = () => {
-        setIsOffline(false);
-        if (data.settings.isLoggedIn) {
-            handleManualSync(true); 
-        }
-    };
-    const handleOffline = () => setIsOffline(true);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-    };
-  }, [data.settings.isLoggedIn]);
-
+  // Initial Boot Logic
   useEffect(() => {
     const initApp = async () => {
       const localData = storageService.loadData();
       if (localData && localData.clinicName) {
         setData(mergeDataWithLocalPrefs(localData));
-      }
-
-      const isInitiallyOffline = !navigator.onLine;
-      
-      if (isInitiallyOffline) {
-          const hasLoggedInBefore = localData && localData.settings && localData.settings.isLoggedIn;
-          if (!hasLoggedInBefore) {
-              setOfflineStatus('login_required');
-              setAppState('offline_prompt');
-              return;
-          }
-          setAppState('offline_prompt');
-          return;
       }
 
       const user = await supabaseService.getUser();
@@ -270,22 +141,40 @@ export default function App() {
 
           if (cloudData) {
             const currentLocal = storageService.loadData();
-            const cloudTS = cloudData.lastUpdated || 0;
-            const localTS = currentLocal?.lastUpdated || 0;
-            
-            if (cloudTS > localTS) {
+            // Only merge if cloud is strictly newer than what we have on disk
+            if (!currentLocal || (cloudData.lastUpdated || 0) > (currentLocal.lastUpdated || 0)) {
                 const merged = mergeDataWithLocalPrefs(cloudData);
                 setData(merged);
                 storageService.saveData(merged);
-            } else if (localTS > cloudTS && localData.settings.isLoggedIn) {
-                await supabaseService.saveData(localData);
             }
-            localStorage.setItem('dentro_last_online_sync', Date.now().toString());
           }
         } catch (e) {
           console.warn("Initial sync failed or timed out, proceeding with local data.", e);
         } finally {
-          finalizeBoot();
+          const currentData = storageService.loadData();
+          if (currentData && currentData.clinicName) {
+            const savedProfileType = localStorage.getItem('dentro_profile_type');
+            const savedDocId = localStorage.getItem('dentro_active_profile');
+            const savedSecId = localStorage.getItem('dentro_active_secretary');
+
+            if (savedProfileType === 'doctor' && savedDocId) {
+                setActiveDoctorId(savedDocId);
+                setAppState('app');
+            } else if (savedProfileType === 'secretary' && savedSecId) {
+                setActiveSecretaryId(savedSecId);
+                setAppState('app');
+                setCurrentView('patients');
+            } else if (savedProfileType === 'admin') {
+                setActiveDoctorId(null);
+                setActiveSecretaryId(null);
+                setAppState('app');
+            } else {
+                setAppState('profile_select');
+            }
+          } else {
+            setAppState('app');
+          }
+          setIsInitialLoading(false);
         }
       };
 
@@ -355,7 +244,7 @@ export default function App() {
   };
 
   const closeConfirm = () => setConfirmState(prev => ({ ...prev, isOpen: false }));
-  const currentLang = appState === 'landing' || appState === 'offline_prompt' ? (localStorage.getItem('dentro_device_lang') as Language || landingLang) : deviceLang;
+  const currentLang = appState === 'landing' ? landingLang : deviceLang;
   const t = LABELS[currentLang];
   const isRTL = currentLang === 'ar' || currentLang === 'ku';
 
@@ -397,34 +286,53 @@ export default function App() {
     window.history.pushState({ view: currentView, patientId: selectedPatientId, patientTab: patientTab, category: selectedCategory, calendarView: calendarView, date: currentDate.toISOString() }, '');
   }, [currentView, selectedPatientId, patientTab, selectedCategory, calendarView, currentDate, appState]);
 
+  const handleManualSync = async (force: boolean = false) => {
+      if (!navigator.onLine || !data.settings.isLoggedIn || (syncStatus === 'syncing' && !force)) return;
+      setSyncStatus('syncing');
+      try {
+          const cloudData = await supabaseService.loadData();
+          if (cloudData) {
+              const localData = storageService.loadData();
+              if ((cloudData.lastUpdated || 0) > (localData?.lastUpdated || 0)) {
+                  const merged = mergeDataWithLocalPrefs(cloudData);
+                  setData(merged); storageService.saveData(merged); setSyncStatus('synced'); return true;
+              } else { setSyncStatus('synced'); return true; }
+          }
+          setSyncStatus('syncing'); return true;
+      } catch (e) { setSyncStatus('error'); return false; }
+  };
+
+  const forceSyncToCloud = async (overrideData?: ClinicData) => {
+      const dataToSave = overrideData || data;
+      if (!navigator.onLine || !dataToSave.settings.isLoggedIn) return;
+      setSyncStatus('syncing');
+      try {
+          await supabaseService.saveData(dataToSave); setSyncStatus('synced');
+          setData(prev => ({ ...prev, lastSynced: new Date().toISOString() }));
+      } catch (e) { setSyncStatus('error'); }
+  };
+
   useEffect(() => {
       if (!data.settings.isLoggedIn || !navigator.onLine || isInitialLoading) return;
       const pollInterval = setInterval(() => handleManualSync(), 60000); 
       const onFocus = () => handleManualSync();
       window.addEventListener('focus', onFocus);
       return () => { clearInterval(pollInterval); window.removeEventListener('focus', onFocus); };
-  }, [data.settings.isLoggedIn, isInitialLoading]);
+  }, [data.settings.isLoggedIn, data.lastUpdated, isInitialLoading]);
 
+  // Cloud pushing with debounce. (Redundant localStorage call removed as it's now immediate)
   useEffect(() => {
     if (!data.settings.isLoggedIn || isInitialLoading) return;
     const timer = setTimeout(async () => {
         if (navigator.onLine) {
-            handleManualSync(); 
+            setSyncStatus('syncing');
+            try { await supabaseService.saveData(data); setSyncStatus('synced'); } catch (e) { setSyncStatus('error'); }
         } else setSyncStatus('offline');
     }, 2000); 
     return () => clearTimeout(timer);
   }, [data, isInitialLoading]);
 
-  const handleInstallApp = async () => { 
-    if (!deferredPrompt) {
-        alert(isRTL ? "التثبيت مدعوم فقط عبر متصفح Chrome أو Safari (على آيفون). يرجى التأكد من أنك تستخدم متصفحاً متوافقاً." : "Installation is supported on Chrome or Safari. Please ensure you're using a compatible browser.");
-        return;
-    }
-    deferredPrompt.prompt(); 
-    await deferredPrompt.userChoice; 
-    // We don't nullify deferredPrompt here anymore to satisfy user request "doesn't disappear"
-    // Although the browser might consume it, the UI logic in Settings handles the fallback.
-  };
+  const handleInstallApp = async () => { if (!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice; };
 
   const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault(); setAuthLoading(true); setAuthError('');
@@ -436,7 +344,6 @@ export default function App() {
                 const newData = mergeDataWithLocalPrefs(cloudData); newData.settings.isLoggedIn = true;
                 setData(newData); storageService.saveData(newData); setIsInitialLoading(false); 
                 const existingLang = localStorage.getItem('dentro_device_lang'); if (!existingLang) { setDeviceLang(landingLang); localStorage.setItem('dentro_device_lang', landingLang); } else setDeviceLang(existingLang as Language);
-                localStorage.setItem('dentro_last_online_sync', Date.now().toString());
                 if (cloudData.clinicName) setAppState('profile_select'); else { setOnboardingStep(0); setAppState('app'); }
               }
           }
@@ -470,6 +377,8 @@ export default function App() {
         ...prev, 
         doctors: prev.doctors.map(d => d.id === id ? { ...d, ...updates } : d) 
     }));
+    
+    // Logic to jump to profile selector if forceLogout is requested AND this doctor is the current profile
     if (forceLogout && (activeDoctorId === id)) {
         setActiveDoctorId(null);
         localStorage.removeItem('dentro_profile_type');
@@ -521,6 +430,7 @@ export default function App() {
         const nextPatients = prev.patients.map(p => {
             if (p.id === id) {
                 const updatedPatient = { ...p, ...updates };
+                // If name changed, update it in all nested appointments too for data integrity
                 if (updates.name && updates.name !== p.name) {
                     updatedPatient.appointments = updatedPatient.appointments.map(a => ({
                         ...a,
@@ -534,11 +444,12 @@ export default function App() {
 
         const next = { 
             ...prev, 
-            lastUpdated: Date.now(), 
+            lastUpdated: isInitialLoading ? prev.lastUpdated : Date.now(), 
             patients: nextPatients 
         };
+        // Commit to disk immediately
         storageService.saveData(next);
-        if (immediateSave && !isInitialLoading) handleManualSync(); 
+        if (immediateSave && !isInitialLoading) forceSyncToCloud(next);
         return next;
     });
   };
@@ -581,7 +492,7 @@ export default function App() {
   const allAppointments = [ 
     ...data.patients.flatMap(p => p.appointments.map(a => ({
         ...a, 
-        patientName: p.name, 
+        patientName: p.name, // Force always using the current patient name from the main record
         patient: p
     }))), 
     ...(data.guestAppointments || []).map(a => ({...a, patient: null as Patient | null})) 
@@ -589,83 +500,6 @@ export default function App() {
   const activePatient = selectedPatientId ? data.patients.find(p => p.id === selectedPatientId) : null;
 
   if (appState === 'loading' || isInitialLoading) { return ( <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 animate-fade-in"> <div className="flex items-center justify-center mb-6 animate-scale-up"> <Logo className="w-24 h-24" /> </div> <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-white dark:to-gray-300 mb-2">Dentro</h1> <p className="text-gray-400 dark:text-gray-500 text-sm font-medium tracking-wide uppercase mb-8">Clinic Management System</p> {isInitialLoading && data.settings.isLoggedIn && ( <div className="flex flex-col items-center gap-4 mb-6"> <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-6 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 animate-fade-in"> <RefreshCw size={18} className="animate-spin text-primary-600" /> <span className="text-sm font-bold text-gray-700 dark:text-gray-300 font-cairo"> {t.syncOnLoad} </span> </div> </div> )} <div className="w-48 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"> <div className="h-full bg-primary-500 w-1/2 animate-[pulse_1s_ease-in-out_infinite] rounded-full"></div> </div> </div> ) }
-  
-  if (appState === 'offline_prompt') {
-      return (
-          <div className={`min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-6 ${isRTL ? 'font-cairo' : 'font-sans'}`} dir={isRTL ? 'rtl' : 'ltr'}>
-              <div className="bg-white dark:bg-gray-800 p-8 md:p-12 rounded-[3rem] shadow-2xl border border-gray-100 dark:border-gray-700 max-w-md w-full text-center animate-scale-up">
-                  {offlineStatus === 'login_required' ? (
-                      <div className="animate-fade-in">
-                          <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner">
-                              <LogIn size={40} />
-                          </div>
-                          <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">{t.loginRequiredOffline}</h2>
-                          <p className="text-gray-500 dark:text-gray-400 font-bold leading-relaxed mb-8">
-                              {t.loginRequiredOfflineDesc}
-                          </p>
-                          <button 
-                              onClick={() => window.location.reload()}
-                              className="w-full py-4 bg-primary-600 text-white rounded-2xl font-black shadow-xl shadow-primary-500/30 hover:bg-primary-700 transition transform active:scale-95 flex items-center justify-center gap-2"
-                          >
-                              <RefreshCw size={20} />
-                              <span>{isRTL ? "إعادة المحاولة (اتصال)" : "Retry (Online)"}</span>
-                          </button>
-                      </div>
-                  ) : offlineStatus === 'blocked' ? (
-                      <div className="animate-fade-in">
-                          <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner">
-                              <AlertCircle size={40} />
-                          </div>
-                          <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">{t.offlineAccessDenied}</h2>
-                          <p className="text-gray-500 dark:text-gray-400 font-bold leading-relaxed mb-8">
-                              {t.offlineLimitExceeded}
-                          </p>
-                          <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 mb-8">
-                              <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">{t.lastSyncLabel}</span>
-                              <span className="font-bold text-gray-700 dark:text-gray-200">
-                                  {localStorage.getItem('dentro_last_online_sync') 
-                                    ? new Date(parseInt(localStorage.getItem('dentro_last_online_sync')!)).toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { dateStyle: 'full' })
-                                    : '---'}
-                              </span>
-                          </div>
-                          <button 
-                              onClick={() => window.location.reload()}
-                              className="w-full py-4 bg-primary-600 text-white rounded-2xl font-black shadow-xl shadow-primary-500/30 hover:bg-primary-700 transition transform active:scale-95"
-                          >
-                              {t.reconnectNow}
-                          </button>
-                      </div>
-                  ) : (
-                      <div className="animate-fade-in">
-                          <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner">
-                              <WifiOff size={40} />
-                          </div>
-                          <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-4">{t.offlineTitle}</h2>
-                          <p className="text-gray-500 dark:text-gray-400 font-bold leading-relaxed mb-10">
-                              {t.offlineDesc}
-                          </p>
-                          <div className="flex flex-col gap-3">
-                              <button 
-                                  onClick={handleContinueOffline}
-                                  className="w-full py-4 bg-primary-600 text-white rounded-2xl font-black shadow-xl shadow-primary-500/30 hover:bg-primary-700 transition transform hover:-translate-y-1 active:scale-95 flex items-center justify-center gap-2"
-                              >
-                                  <span>{t.continueOffline}</span>
-                                  <ArrowRight size={20} className="rtl:rotate-180" />
-                              </button>
-                              <button 
-                                  onClick={() => window.location.reload()}
-                                  className="w-full py-4 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-300 rounded-2xl font-bold hover:bg-gray-100 transition"
-                              >
-                                  {isRTL ? "إعادة المحاولة" : "Retry Connection"}
-                              </button>
-                          </div>
-                      </div>
-                  )}
-              </div>
-          </div>
-      );
-  }
-
   if (appState === 'landing') return <LandingPage setAppState={setAppState} landingLang={landingLang} setLandingLang={setLandingLang} isRTL={isRTL} />;
   if (appState === 'auth') return <AuthScreen t={t} loginEmail={loginEmail} setLoginEmail={setLoginEmail} loginPassword={loginPassword} setLoginPassword={setLoginPassword} authLoading={authLoading} authError={authError} handleAuth={handleAuth} setAppState={setAppState} />;
   if (appState === 'profile_select') return <ProfileSelector t={t} data={data} loginPassword={loginPassword} currentLang={currentLang} isRTL={isRTL} onSelectAdmin={(pass) => { handleProfileSelection('admin'); }} onSelectDoctor={(id, pass) => { handleProfileSelection('doctor', id); }} onSelectSecretary={(id, pass) => { handleProfileSelection('secretary', id); }} onLogout={performFullLogout} syncStatus={syncStatus} />;
@@ -682,7 +516,7 @@ export default function App() {
              {currentView === 'dashboard' && !isSecretary && ( <DashboardView t={t} data={data} allAppointments={allAppointments} setData={setData} activeDoctorId={activeDoctorId} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} /> )}
              {currentView === 'patients' && !selectedPatientId && ( <PatientsView t={t} data={filteredData} isRTL={isRTL} currentLang={currentLang} setSelectedPatientId={setSelectedPatientId} setPatientTab={setPatientTab} setCurrentView={setCurrentView} setShowNewPatientModal={setShowNewPatientModal} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onAddAppointment={handleQuickBook} /> )}
              {currentView === 'patients' && selectedPatientId && activePatient && ( <PatientDetails t={t} data={data} setData={setData} activePatient={activePatient} patientTab={patientTab} setPatientTab={setPatientTab} setSelectedPatientId={setSelectedPatientId} currentLang={currentLang} isRTL={isRTL} updatePatient={updatePatient} handleDeletePatient={handleDeletePatient} handleUpdateTooth={handleUpdateTooth} handleUpdateToothSurface={handleUpdateToothSurface} handleUpdateToothNote={handleUpdateToothNote} handleUpdateHead={handleUpdateHead} handleUpdateBody={handleUpdateBody} handleAddRCT={handleAddRCT} handleDeleteRCT={handleDeleteRCT} handleDeleteAppointment={handleDeleteAppointment} handleUpdateAppointmentStatus={handleUpdateAppointmentStatus} handleDeleteRx={handleDeleteRx} setPrintingRx={setPrintingRx} setPrintingPayment={setPrintingPayment} setPrintingAppointment={setPrintingAppointment} setPrintingExamination={setPrintingExamination} handleRxFileUpload={handleRxFileUpload} setShowEditPatientModal={setShowEditPatientModal} setShowAppointmentModal={setShowAppointmentModal} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowPaymentModal={setShowPaymentModal} setPaymentType={setPaymentType} setShowRxModal={setShowRxModal} setShowAddMasterDrugModal={setShowAddMasterDrugModal} openConfirm={openConfirm} setPrintingDocument={setPrintingDocument} isSecretary={isSecretary} /> )}
-             {currentView === 'calendar' && ( <CalendarView t={t} data={data} currentLang={currentLang} isRTL={isRTL} calendarView={calendarView} setCalendarView={setCalendarView} currentDate={currentDate} setCurrentDate={setCurrentDate} filteredAppointments={allAppointments} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowAppointmentModal={setShowAppointmentModal} handleUpdateAppointmentStatus={handleUpdateAppointmentStatus} handleDeleteAppointment={handleDeleteAppointment} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} setGuestToConvert={setGuestToConvert} setShowNewPatientModal={setShowNewPatientModal} openConfirm={openConfirm} setData={setData} activeDoctorId={activeDoctorId} iisSecretary={isSecretary} /> )}
+             {currentView === 'calendar' && ( <CalendarView t={t} data={data} currentLang={currentLang} isRTL={isRTL} calendarView={calendarView} setCalendarView={setCalendarView} currentDate={currentDate} setCurrentDate={setCurrentDate} filteredAppointments={allAppointments} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowAppointmentModal={setShowAppointmentModal} handleUpdateAppointmentStatus={handleUpdateAppointmentStatus} handleDeleteAppointment={handleDeleteAppointment} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} setGuestToConvert={setGuestToConvert} setShowNewPatientModal={setShowNewPatientModal} openConfirm={openConfirm} setData={setData} activeDoctorId={activeDoctorId} isSecretary={isSecretary} /> )}
              {currentView === 'memos' && ( <MemosView t={t} data={data} setSelectedMemo={setSelectedMemo} setShowMemoModal={setShowMemoModal} setMemoType={setMemoType} setTempTodos={setTempTodos} handleDeleteMemo={handleDeleteMemo} currentLang={currentLang} openConfirm={openConfirm} /> )}
              {currentView === 'purchases' && ( <PurchasesView t={t} data={data} setSelectedSupply={setSelectedSupply} setShowSupplyModal={setShowSupplyModal} handleConvertToExpense={handleConvertToExpense} handleDeleteSupply={handleDeleteSupply} openConfirm={openConfirm} /> )}
              {currentView === 'inventory' && ( <InventoryView t={t} data={data} setSelectedInventoryItem={setSelectedInventoryItem} setShowInventoryModal={setShowInventoryModal} handleDeleteInventoryItem={handleDeleteInventoryItem} openConfirm={openConfirm} /> )}
@@ -693,7 +527,7 @@ export default function App() {
       </main>
       <PrintLayouts t={t} data={data} activePatient={activePatient} printingRx={printingRx} setPrintingRx={setPrintingRx} printingPayment={printingPayment} setPrintingPayment={setPrintingPayment} printingAppointment={printingAppointment} setPrintingAppointment={setPrintingAppointment} printingDocument={printingDocument} setPrintingDocument={setPrintingDocument} printingExamination={printingExamination} setPrintingExamination={setPrintingExamination} currentLang={currentLang} isRTL={isRTL} />
       <PatientModal show={showNewPatientModal || showEditPatientModal} onClose={() => { setShowNewPatientModal(false); setShowEditPatientModal(false); }} t={t} isRTL={isRTL} currentLang={currentLang} data={activeDoctorId ? filteredData : data} handleAddPatient={handleAddPatient} updatePatient={updatePatient} guestToConvert={guestToConvert} activePatient={showEditPatientModal ? activePatient : null} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} activeDoctorId={activeDoctorId} />
-      <PaymentModal show={showPaymentModal} onClose={() => setShowPaymentModal(false)} t={t} activePatient={activePatient} paymentType={paymentType} data={data} handleSavePayment={handleAddPayment} currentLang={currentLang} />
+      <PaymentModal show={showPaymentModal} onClose={() => setShowPaymentModal(false)} t={t} activePatient={activePatient} paymentType={paymentType} data={data} handleAddPatient={handleAddPatient} currentLang={currentLang} />
       <AppointmentModal show={showAppointmentModal} onClose={() => { setShowAppointmentModal(false); setApptPatientId(null); }} t={t} selectedAppointment={selectedAppointment} appointmentMode={appointmentMode} setAppointmentMode={setAppointmentMode} selectedPatientId={apptPatientId || (selectedPatientId && currentView === 'patients' ? selectedPatientId : null)} data={activeDoctorId ? filteredData : data} currentDate={currentDate} handleAddAppointment={handleAddAppointment} isRTL={isRTL} currentLang={currentLang} />
       <AddMasterDrugModal show={showAddMasterDrugModal} onClose={() => setShowAddMasterDrugModal(false)} t={t} data={data} handleManageMedications={handleManageMedications} handleDeleteMasterDrug={handleDeleteMasterDrug} currentLang={currentLang} openConfirm={openConfirm} />
       <MemoModal show={showMemoModal} onClose={() => setShowMemoModal(false)} t={t} selectedMemo={selectedMemo} memoType={memoType} setMemoType={setMemoType} tempTodos={tempTodos} setTempTodos={setTempTodos} handleSaveMemo={handleSaveMemo} currentLang={currentLang} />

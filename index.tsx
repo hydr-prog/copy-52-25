@@ -14,37 +14,15 @@ root.render(
   </React.StrictMode>
 );
 
-// تسجيل الـ Service Worker بشكل يضمن التحكم المباشر
+// Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    navigator.serviceWorker.register('/sw.js')
       .then(registration => {
-        console.log('SW Registered successfully:', registration.scope);
-        
-        // التحقق من وجود تحديثات وتفعيلها فوراً
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // إذا وجد تحديث، نقوم بتنبيه التطبيق أو إعادة التحميل
-                window.location.reload();
-              }
-            });
-          }
-        });
+        console.log('SW registered: ', registration);
       })
-      .catch(error => {
-        console.error('SW Registration failed:', error);
+      .catch(registrationError => {
+        console.log('SW registration failed: ', registrationError);
       });
-  });
-
-  // التأكد من تفعيل الكنترولر فوراً
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      window.location.reload();
-      refreshing = true;
-    }
   });
 }

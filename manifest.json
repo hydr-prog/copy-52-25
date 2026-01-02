@@ -1,31 +1,24 @@
+
 {
   "short_name": "Dentro",
-  "name": "Dentro Clinic Management",
+  "name": "Dentro Clinic App",
   "icons": [
     {
       "src": "https://res.cloudinary.com/dvcaqoy2a/image/upload/v1765499260/Dentro-app-logo_fpqnjq.svg",
       "type": "image/svg+xml",
       "sizes": "192x192",
-      "purpose": "any"
+      "purpose": "any maskable"
     },
     {
       "src": "https://res.cloudinary.com/dvcaqoy2a/image/upload/v1765499260/Dentro-app-logo_fpqnjq.svg",
       "type": "image/svg+xml",
       "sizes": "512x512",
-      "purpose": "any"
-    },
-    {
-      "src": "https://res.cloudinary.com/dvcaqoy2a/image/upload/v1765499260/Dentro-app-logo_fpqnjq.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "theme_color": "#4f46e5",
-  "background_color": "#ffffff",
-  "description": "Professional Dental Clinic Management System",
-  "categories": ["medical", "productivity"]
+  "background_color": "#ffffff"
 }
