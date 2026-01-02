@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Sparkles, X, BrainCircuit, Loader2, Info, AlertCircle, CloudCheck, Zap, ShieldCheck, Settings2, ArrowRightCircle } from 'lucide-react';
@@ -178,7 +177,9 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
                 <BrainCircuit size={40} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-indigo-600 animate-pulse" />
               </div>
               <p className="font-black text-2xl text-indigo-600 animate-pulse">{t.aiAnalyzing}</p>
-              <p className="text-gray-400 text-sm mt-2 font-bold uppercase tracking-widest">Processing Clinical Data...</p>
+              <p className="text-gray-400 text-sm mt-2 font-bold uppercase tracking-widest">
+                {isRTL ? "جاري معالجة البيانات السريرية..." : "Processing Clinical Data..."}
+              </p>
             </div>
           ) : insight ? (
             <div className="animate-fade-in space-y-8">
@@ -188,7 +189,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
                   <h4 className="font-black text-xl uppercase tracking-tight">{t.aiResponseTitle}</h4>
                 </div>
                 <div className="bg-green-100 dark:bg-green-900/30 text-green-600 px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 uppercase tracking-tighter">
-                   <ShieldCheck size={12}/> Analysis Verified
+                   <ShieldCheck size={12}/> 
+                   {isRTL ? "تم التحقق من التحليل" : "Analysis Verified"}
                 </div>
               </div>
 
