@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud } from 'lucide-react';
 import { ClinicData, Doctor, Secretary, Patient, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle, Examination } from './types';
@@ -97,16 +96,13 @@ export default function App() {
   // PWA Install logic
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     window.addEventListener('appinstalled', () => {
-      // Log install to analytics or clear the deferred prompt
       setDeferredPrompt(null);
       console.log('PWA was installed');
     });
@@ -119,25 +115,19 @@ export default function App() {
   const handleInstallApp = async () => {
     const currentT = LABELS[deviceLang];
     if (!deferredPrompt) {
-        // If app is already installed or prompt is not ready, give manual info
         alert(currentT.installManualInfo);
         return;
     }
-    // Show the install prompt
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     console.log(`User response to the install prompt: ${outcome}`);
-    // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
   };
 
-  // Improved Updater that commits to LocalStorage immediately
   const updateLocalData = (updater: (prev: ClinicData) => ClinicData) => {
       setData(prev => {
           const next = updater(prev);
           const updatedNext = { ...next, lastUpdated: isInitialLoading ? prev.lastUpdated : Date.now() };
-          // Persist to disk instantly to prevent race conditions during cloud polling
           storageService.saveData(updatedNext);
           return updatedNext;
       });
@@ -179,7 +169,6 @@ export default function App() {
 
           if (cloudData) {
             const currentLocal = storageService.loadData();
-            // Only merge if cloud is strictly newer than what we have on disk
             if (!currentLocal || (cloudData.lastUpdated || 0) > (currentLocal.lastUpdated || 0)) {
                 const merged = mergeDataWithLocalPrefs(cloudData);
                 setData(merged);
@@ -227,6 +216,10 @@ export default function App() {
     if (!navigator.onLine) return;
 
     const checkSecurity = async () => {
+      // CRITICAL FIX: Skip security check if clinic isn't set up yet.
+      // This prevents auto-logout during onboarding for new accounts.
+      if (!data.clinicName) return;
+
       const lastCheck = localStorage.getItem('dentro_last_security_check');
       const now = Date.now();
       const oneDay = 24 * 60 * 60 * 1000;
@@ -242,7 +235,7 @@ export default function App() {
     };
 
     checkSecurity();
-  }, [appState]);
+  }, [appState, data.clinicName]);
 
   useEffect(() => {
     googleDriveService.init(() => console.log("Google Drive System Ready"));
@@ -358,7 +351,6 @@ export default function App() {
       return () => { clearInterval(pollInterval); window.removeEventListener('focus', onFocus); };
   }, [data.settings.isLoggedIn, data.lastUpdated, isInitialLoading]);
 
-  // Cloud pushing with debounce. (Redundant localStorage call removed as it's now immediate)
   useEffect(() => {
     if (!data.settings.isLoggedIn || isInitialLoading) return;
     const timer = setTimeout(async () => {
@@ -414,7 +406,6 @@ export default function App() {
         doctors: prev.doctors.map(d => d.id === id ? { ...d, ...updates } : d) 
     }));
     
-    // Logic to jump to profile selector if forceLogout is requested AND this doctor is the current profile
     if (forceLogout && (activeDoctorId === id)) {
         setActiveDoctorId(null);
         localStorage.removeItem('dentro_profile_type');
@@ -466,7 +457,6 @@ export default function App() {
         const nextPatients = prev.patients.map(p => {
             if (p.id === id) {
                 const updatedPatient = { ...p, ...updates };
-                // If name changed, update it in all nested appointments too for data integrity
                 if (updates.name && updates.name !== p.name) {
                     updatedPatient.appointments = updatedPatient.appointments.map(a => ({
                         ...a,
@@ -483,7 +473,6 @@ export default function App() {
             lastUpdated: isInitialLoading ? prev.lastUpdated : Date.now(), 
             patients: nextPatients 
         };
-        // Commit to disk immediately
         storageService.saveData(next);
         if (immediateSave && !isInitialLoading) forceSyncToCloud(next);
         return next;
@@ -528,7 +517,7 @@ export default function App() {
   const allAppointments = [ 
     ...data.patients.flatMap(p => p.appointments.map(a => ({
         ...a, 
-        patientName: p.name, // Force always using the current patient name from the main record
+        patientName: p.name, 
         patient: p
     }))), 
     ...(data.guestAppointments || []).map(a => ({...a, patient: null as Patient | null})) 
@@ -539,6 +528,7 @@ export default function App() {
   if (appState === 'landing') return <LandingPage setAppState={setAppState} landingLang={landingLang} setLandingLang={setLandingLang} isRTL={isRTL} />;
   if (appState === 'auth') return <AuthScreen t={t} loginEmail={loginEmail} setLoginEmail={setLoginEmail} loginPassword={loginPassword} setLoginPassword={setLoginPassword} authLoading={authLoading} authError={authError} handleAuth={handleAuth} setAppState={setAppState} />;
   if (appState === 'profile_select') return <ProfileSelector t={t} data={data} loginPassword={loginPassword} currentLang={currentLang} isRTL={isRTL} onSelectAdmin={(pass) => { handleProfileSelection('admin'); }} onSelectDoctor={(id, pass) => { handleProfileSelection('doctor', id); }} onSelectSecretary={(id, pass) => { handleProfileSelection('secretary', id); }} onLogout={performFullLogout} syncStatus={syncStatus} />;
+  
   if (!data.settings.isLoggedIn || !data.clinicName) return ( <> <ConfirmationModal isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} onConfirm={() => { confirmState.onConfirm(); closeConfirm(); }} onCancel={closeConfirm} lang={currentLang} confirmLabel={confirmState.confirmLabel} cancelLabel={confirmState.cancelLabel} /> <ClinicSetup t={t} data={data} setData={setData} onboardingStep={onboardingStep} setOnboardingStep={setOnboardingStep} handleClinicNameSubmit={handleClinicNameSubmit} handleAddDoctor={handleAddDoctorSetup} handleDeleteDoctor={handleDeleteDoctor} handleFinishSetup={handleFinishSetup} isRTL={isRTL} openConfirm={openConfirm} /> </> );
 
   return (
