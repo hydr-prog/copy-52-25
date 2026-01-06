@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud } from 'lucide-react';
-import { ClinicData, Doctor, Secretary, Patient, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle, Examination, MedicalConditionItem, PatientQueryAnswer } from './types';
+import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud, LayoutGrid, Folder, ChevronLeft, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { ClinicData, Doctor, Secretary, Patient, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle, Examination, MedicalConditionItem, PatientQueryAnswer, MedicationCategory } from './types';
 import { INITIAL_DATA } from './initialData';
 import { LABELS } from './locales';
 import { storageService } from './services/storage';
@@ -91,7 +91,83 @@ export default function App() {
   });
   const [activeThemeId, setActiveThemeId] = useState<string>(() => localStorage.getItem('dentro_theme_id') || 'classic');
 
-  // التحديث الوظيفي الموحد (المفتاح لحل مشكلة اختفاء البيانات)
+  // --- Rx Browse State ---
+  const [rxBrowseView, setRxBrowseView] = useState<'search' | 'groups' | 'group_meds'>('search');
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      const isRTL = deviceLang === 'ar' || deviceLang === 'ku';
+      alert(isRTL 
+        ? 'التطبيق مثبت بالفعل أو أن متصفحك لا يدعم التثبيت التلقائي حالياً. يمكنك تثبيته يدوياً من قائمة إعدادات المتصفح عن طريق اختيار "إضافة إلى الشاشة الرئيسية" (Add to Home Screen).' 
+        : 'App is already installed or your browser doesn\'t support auto-install right now. You can install it manually from your browser menu by selecting "Add to Home Screen".');
+    }
+  };
+
+  // --- Navigation & Back Button Handling ---
+  const isInternalStateChange = useRef(false);
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      // Check if any modal is open and close it first
+      if (showNewPatientModal) setShowNewPatientModal(false);
+      else if (showEditPatientModal) setShowEditPatientModal(false);
+      else if (showPaymentModal) setShowPaymentModal(false);
+      else if (showAppointmentModal) setShowAppointmentModal(false);
+      else if (showMemoModal) setShowMemoModal(false);
+      else if (showLabOrderModal) setShowLabOrderModal(false);
+      else if (showInventoryModal) setShowInventoryModal(false);
+      else if (showRxModal) setShowRxModal(false);
+      else if (showAddMasterDrugModal) setShowAddMasterDrugModal(false);
+      else if (showSupplyModal) setShowSupplyModal(false);
+      else if (showExpenseModal) setShowExpenseModal(false);
+      else if (isSidebarOpen) setSidebarOpen(false);
+      else if (selectedPatientId) setSelectedPatientId(null);
+      else if (currentView !== 'patients' && appState === 'app') setCurrentView('patients');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    showNewPatientModal, showEditPatientModal, showPaymentModal, showAppointmentModal, 
+    showMemoModal, showLabOrderModal, showInventoryModal, showRxModal, 
+    showAddMasterDrugModal, showSupplyModal, showExpenseModal, isSidebarOpen, 
+    selectedPatientId, currentView, appState
+  ]);
+
+  const pushNavState = () => {
+    window.history.pushState({ navigated: true }, "");
+  };
+
+  useEffect(() => {
+    if (appState !== 'app') return;
+  }, [selectedPatientId, currentView, showRxModal]);
+
+  const handleOpenPatient = (id: string) => {
+    pushNavState();
+    setSelectedPatientId(id);
+  };
+
+  const handleOpenModal = (setter: (val: boolean) => void) => {
+    pushNavState();
+    setter(true);
+  };
+
   const updateLocalData = (updater: (prev: ClinicData) => ClinicData) => {
       setData(prev => {
           const next = updater(prev);
@@ -103,6 +179,28 @@ export default function App() {
           storageService.saveData(updatedNext);
           return updatedNext;
       });
+  };
+
+  const handleRxFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result as string;
+            updateLocalData(prev => ({
+                ...prev,
+                settings: { ...prev.settings, rxBackgroundImage: base64String }
+            }));
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveRxBg = () => {
+    updateLocalData(prev => ({
+        ...prev,
+        settings: { ...prev.settings, rxBackgroundImage: '' }
+    }));
   };
 
   const mergeDataWithLocalPrefs = (externalData: ClinicData): ClinicData => {
@@ -167,7 +265,6 @@ export default function App() {
     initApp();
   }, []);
 
-  // المزامنة التلقائية - تم تحديث المنطق لضمان عدم الكتابة فوق التعديلات الحالية
   useEffect(() => {
     if (!data.settings.isLoggedIn || isInitialLoading) return;
     const timer = setTimeout(async () => {
@@ -179,7 +276,6 @@ export default function App() {
                     setData(prev => {
                         const merged = granularMerge(prev, latestCloud);
                         const final = mergeDataWithLocalPrefs(merged);
-                        // نرفع للسحاب فقط بعد التأكد من الدمج
                         supabaseService.saveData(final);
                         storageService.saveData(final);
                         return final;
@@ -190,11 +286,10 @@ export default function App() {
                 setSyncStatus('synced'); 
             } catch (e) { setSyncStatus('error'); }
         } else setSyncStatus('offline');
-    }, 15000); // 15 ثانية لتقليل ضغط الشبكة وضمان استقرار البيانات أثناء الكتابة
+    }, 15000);
     return () => clearTimeout(timer);
   }, [data, isInitialLoading]);
 
-  // Auth Handlers
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault(); setAuthLoading(true); setAuthError('');
     try {
@@ -211,8 +306,6 @@ export default function App() {
   };
 
   const handleClinicNameSubmit = (name: string) => { updateLocalData(prev => ({ ...prev, clinicName: name })); setAppState('profile_select'); };
-
-  // --- ATOMIC DATA HANDLERS ---
 
   const updatePatient = (id: string, updates: Partial<Patient>) => {
     updateLocalData(prev => ({
@@ -306,7 +399,6 @@ export default function App() {
     setShowMemoModal(false); setSelectedMemo(null);
   };
 
-  // UI Handlers
   useEffect(() => {
       const theme = THEMES.find(t => t.id === activeThemeId) || THEMES[0];
       const root = document.documentElement;
@@ -331,12 +423,20 @@ export default function App() {
   const currentT = LABELS[deviceLang];
   const isRTL = deviceLang === 'ar' || deviceLang === 'ku';
 
+  // Prescription Search Logic
+  const filteredMedsForSearch = medSearch.trim() 
+    ? data.medications.filter(m => m.name.toLowerCase().includes(medSearch.toLowerCase())) 
+    : [];
+
   if (appState === 'loading' || isInitialLoading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <Logo className="w-24 h-24 mb-6 animate-pulse" />
-      <div className="w-48 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 font-cairo">
+      <Logo className="w-24 h-24 mb-6" />
+      <div className="w-48 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-4">
         <div className="h-full bg-primary-500 w-1/2 animate-[pulse_1s_ease-in-out_infinite]"></div>
       </div>
+      <p className="text-gray-500 dark:text-gray-400 font-bold animate-pulse text-sm">
+        {deviceLang === 'ar' ? 'جاري المزامنة، يرجى الانتظار قليلاً...' : deviceLang === 'ku' ? 'خەریکی هاوکاتکردنە، تکایە کەمێک چاوەڕوان بن...' : 'Syncing, please wait a moment...'}
+      </p>
     </div>
   );
 
@@ -347,7 +447,7 @@ export default function App() {
   return (
     <div className={`min-h-screen flex bg-page-bg font-${isRTL ? 'cairo' : 'sans'} leading-relaxed overflow-hidden`} dir={isRTL ? 'rtl' : 'ltr'}>
       <ConfirmationModal isOpen={confirmState.isOpen} title={confirmState.title} message={confirmState.message} onConfirm={() => { confirmState.onConfirm(); closeConfirm(); }} onCancel={closeConfirm} lang={deviceLang} />
-      <Sidebar t={currentT} data={data} currentView={currentView} setCurrentView={setCurrentView} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} setSelectedPatientId={setSelectedPatientId} handleLogout={() => { setActiveDoctorId(null); setActiveSecretaryId(null); setAppState('profile_select'); }} isRTL={isRTL} isSecretary={!!activeSecretaryId} handleManualSync={handleManualSync} syncStatus={syncStatus} />
+      <Sidebar t={currentT} data={data} currentView={currentView} setCurrentView={(view) => { if(view !== currentView) pushNavState(); setCurrentView(view); }} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} setSelectedPatientId={setSelectedPatientId} handleLogout={() => { setActiveDoctorId(null); setActiveSecretaryId(null); setAppState('profile_select'); }} isRTL={isRTL} isSecretary={!!activeSecretaryId} handleManualSync={handleManualSync} syncStatus={syncStatus} />
       
       <main className="flex-1 h-screen overflow-y-auto custom-scrollbar relative">
          <div className="lg:hidden p-4 flex justify-between items-center bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30">
@@ -356,24 +456,24 @@ export default function App() {
          </div>
          
          <div className="p-4 md:p-8 pb-20 max-w-7xl mx-auto">
-             {currentView === 'dashboard' && !activeSecretaryId && <DashboardView t={currentT} data={data} allAppointments={allAppointments} setData={setData} activeDoctorId={activeDoctorId} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} />}
-             {currentView === 'patients' && !selectedPatientId && <PatientsView t={currentT} data={filteredData} isRTL={isRTL} currentLang={deviceLang} setSelectedPatientId={setSelectedPatientId} setPatientTab={setPatientTab} setCurrentView={setCurrentView} setShowNewPatientModal={setShowNewPatientModal} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onAddAppointment={(pid) => { setApptPatientId(pid); setShowAppointmentModal(true); }} />}
-             {currentView === 'patients' && selectedPatientId && activePatient && <PatientDetails t={currentT} data={data} setData={setData} activePatient={activePatient} patientTab={patientTab} setPatientTab={setPatientTab} setSelectedPatientId={setSelectedPatientId} currentLang={deviceLang} isRTL={isRTL} updatePatient={updatePatient} handleDeletePatient={(id) => updateLocalData(p => ({...p, patients: p.patients.filter(x => x.id !== id)}))} handleUpdateTooth={handleUpdateTooth} handleUpdateToothSurface={handleUpdateToothSurface} handleUpdateToothNote={handleUpdateToothNote} handleUpdateHead={()=>{}} handleUpdateBody={()=>{}} handleAddRCT={(pid, rct) => updatePatient(pid, { rootCanals: [...(activePatient.rootCanals || []), { ...rct, id: Date.now().toString(), updatedAt: Date.now() }] })} handleDeleteRCT={(pid, rid) => updatePatient(pid, { rootCanals: (activePatient.rootCanals || []).filter(x => x.id !== rid) })} handleDeleteAppointment={(pid, aid) => updatePatient(pid, { appointments: activePatient.appointments.filter(x => x.id !== aid) })} handleUpdateAppointmentStatus={(pid, aid, s) => updatePatient(pid, { appointments: activePatient.appointments.map(x => x.id === aid ? { ...x, status: s, updatedAt: Date.now() } : x) })} handleDeleteRx={(rxid) => updatePatient(activePatient.id, { prescriptions: activePatient.prescriptions.filter(x => x.id !== rxid) })} setPrintingRx={setPrintingRx} setPrintingPayment={setPrintingPayment} setPrintingAppointment={setPrintingAppointment} setPrintingExamination={setPrintingExamination} handleRxFileUpload={()=>{}} setShowEditPatientModal={setShowEditPatientModal} setShowAppointmentModal={setShowAppointmentModal} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowPaymentModal={setShowPaymentModal} setPaymentType={setPaymentType} setShowRxModal={setShowRxModal} setShowAddMasterDrugModal={setShowAddMasterDrugModal} openConfirm={openConfirm} setPrintingDocument={setPrintingDocument} isSecretary={!!activeSecretaryId} />}
-             {currentView === 'calendar' && <CalendarView t={currentT} data={data} currentLang={deviceLang} isRTL={isRTL} calendarView={calendarView} setCalendarView={setCalendarView} currentDate={currentDate} setCurrentDate={setCurrentDate} filteredAppointments={allAppointments} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowAppointmentModal={setShowAppointmentModal} handleUpdateAppointmentStatus={(pid, aid, s) => updatePatient(pid, { appointments: data.patients.find(p=>p.id===pid)!.appointments.map(x=>x.id===aid?{...x,status:s,updatedAt:Date.now()}:x) })} handleDeleteAppointment={(pid, aid) => updatePatient(pid, { appointments: data.patients.find(p=>p.id===pid)!.appointments.filter(x=>x.id!==aid) })} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} setGuestToConvert={setGuestToConvert} setShowNewPatientModal={setShowNewPatientModal} openConfirm={openConfirm} setData={setData} activeDoctorId={activeDoctorId} isSecretary={!!activeSecretaryId} />}
-             {currentView === 'memos' && <MemosView t={currentT} data={data} setSelectedMemo={setSelectedMemo} setShowMemoModal={setShowMemoModal} setMemoType={setMemoType} setTempTodos={setTempTodos} handleDeleteMemo={(id) => updateLocalData(p => ({...p, memos: p.memos.filter(x => x.id !== id)}))} currentLang={deviceLang} openConfirm={openConfirm} />}
-             {currentView === 'purchases' && <PurchasesView t={currentT} data={data} setSelectedSupply={setSelectedSupply} setShowSupplyModal={setShowSupplyModal} handleConvertToExpense={(s) => updateLocalData(p => ({...p, expenses: [{...s, date: new Date().toISOString(), updatedAt: Date.now()}, ...p.expenses], supplies: p.supplies.filter(x=>x.id!==s.id)}))} handleDeleteSupply={(id) => updateLocalData(p => ({...p, supplies: p.supplies.filter(x=>x.id!==id)}))} openConfirm={openConfirm} />}
-             {currentView === 'inventory' && <InventoryView t={currentT} data={data} setSelectedInventoryItem={setSelectedInventoryItem} setShowInventoryModal={setShowInventoryModal} handleDeleteInventoryItem={(id) => updateLocalData(p => ({...p, inventory: p.inventory.filter(x => x.id !== id)}))} openConfirm={openConfirm} />}
-             {currentView === 'expenses' && <ExpensesView t={currentT} data={data} setData={setData} setSelectedExpense={setSelectedExpense} setShowExpenseModal={setShowExpenseModal} handleDeleteExpense={(id) => updateLocalData(p => ({...p, expenses: p.expenses.filter(x => x.id !== id)}))} openConfirm={openConfirm} />}
-             {currentView === 'labOrders' && <LabOrdersView t={currentT} data={data} setData={setData} setSelectedLabOrder={setSelectedLabOrder} setShowLabOrderModal={setShowLabOrderModal} handleDeleteLabOrder={(id) => updateLocalData(p => ({...p, labOrders: p.labOrders.filter(x => x.id !== id)}))} handleUpdateLabOrderStatus={(id, s) => updateLocalData(p => ({...p, labOrders: p.labOrders.map(o => o.id === id ? {...o, status: s, updatedAt: Date.now()} : o)}))} openConfirm={openConfirm} currentLang={deviceLang} />}
-             {currentView === 'settings' && <SettingsView t={currentT} data={data} setData={setData} handleAddDoctor={(n,u,p) => updateLocalData(prev => ({...prev, doctors: [...prev.doctors, {id: Date.now().toString(), name: n, username: u, password: p, updatedAt: Date.now()}]}))} handleUpdateDoctor={(id, u) => updateLocalData(prev => ({...prev, doctors: prev.doctors.map(d => d.id === id ? {...d, ...u, updatedAt: Date.now()} : d)}))} handleDeleteDoctor={(id) => updateLocalData(prev => ({...prev, doctors: prev.doctors.filter(d => d.id !== id)}))} handleAddSecretary={(n,u,p) => updateLocalData(prev => ({...prev, secretaries: [...(prev.secretaries||[]), {id: Date.now().toString(), name: n, username: u, password: p||'123456', updatedAt: Date.now()}]}))} handleDeleteSecretary={(id) => updateLocalData(prev => ({...prev, secretaries: prev.secretaries.filter(s => s.id !== id)}))} handleRxFileUpload={()=>{}} handleImportData={async (e, m) => { const imp = await storageService.importBackup(e.target.files![0]); if(imp) { if(m==='replace') setData(mergeDataWithLocalPrefs({...imp, settings: {...imp.settings, isLoggedIn: true}})); else setData(p => ({...p, patients: [...p.patients, ...imp.patients], lastUpdated: Date.now()})); alert('Done'); } }} syncStatus={syncStatus} deferredPrompt={deferredPrompt} handleInstallApp={()=>{}} openConfirm={openConfirm} currentLang={deviceLang} setDeviceLang={setDeviceLang} currentTheme={activeThemeId==='classic'?'light':'dark'} setLocalTheme={(t) => setActiveThemeId(t==='dark'?'dark-pro':'classic')} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} activeDoctorId={activeDoctorId} activeSecretaryId={activeSecretaryId} deviceScale={deviceScale} setDeviceScale={setDeviceScale} onLinkDrive={()=>{}} />}
+             {currentView === 'dashboard' && !activeSecretaryId && <DashboardView t={currentT} data={data} allAppointments={allAppointments} setData={setData} activeDoctorId={activeDoctorId} setSelectedPatientId={handleOpenPatient} setCurrentView={setCurrentView} setPatientTab={setPatientTab} />}
+             {currentView === 'patients' && !selectedPatientId && <PatientsView t={currentT} data={filteredData} isRTL={isRTL} currentLang={deviceLang} setSelectedPatientId={handleOpenPatient} setPatientTab={setPatientTab} setCurrentView={setCurrentView} setShowNewPatientModal={(val) => handleOpenModal(() => setShowNewPatientModal(val))} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onAddAppointment={(pid) => { setApptPatientId(pid); handleOpenModal(() => setShowAppointmentModal(true)); }} />}
+             {currentView === 'patients' && selectedPatientId && activePatient && <PatientDetails t={currentT} data={data} setData={setData} activePatient={activePatient} patientTab={patientTab} setPatientTab={setPatientTab} setSelectedPatientId={setSelectedPatientId} currentLang={deviceLang} isRTL={isRTL} updatePatient={updatePatient} handleDeletePatient={(id) => updateLocalData(p => ({...p, patients: p.patients.filter(x => x.id !== id)}))} handleUpdateTooth={handleUpdateTooth} handleUpdateToothSurface={handleUpdateToothSurface} handleUpdateToothNote={handleUpdateToothNote} handleUpdateHead={()=>{}} handleUpdateBody={()=>{}} handleAddRCT={(pid, rct) => updatePatient(pid, { rootCanals: [...(activePatient.rootCanals || []), { ...rct, id: Date.now().toString(), updatedAt: Date.now() }] })} handleDeleteRCT={(pid, rid) => updatePatient(pid, { rootCanals: (activePatient.rootCanals || []).filter(x => x.id !== rid) })} handleDeleteAppointment={(pid, aid) => updatePatient(pid, { appointments: activePatient.appointments.filter(x => x.id !== aid) })} handleUpdateAppointmentStatus={(pid, aid, s) => updatePatient(pid, { appointments: activePatient.appointments.map(x => x.id === aid ? { ...x, status: s, updatedAt: Date.now() } : x) })} handleDeleteRx={(rxid) => updatePatient(activePatient.id, { prescriptions: activePatient.prescriptions.filter(x => x.id !== rxid) })} setPrintingRx={setPrintingRx} setPrintingPayment={setPrintingPayment} setPrintingAppointment={setPrintingAppointment} setPrintingExamination={setPrintingExamination} handleRxFileUpload={handleRxFileUpload} handleRemoveRxBg={handleRemoveRxBg} setShowEditPatientModal={(val) => handleOpenModal(() => setShowEditPatientModal(val))} setShowAppointmentModal={(val) => handleOpenModal(() => setShowAppointmentModal(val))} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowPaymentModal={(val) => handleOpenModal(() => setShowPaymentModal(val))} setPaymentType={setPaymentType} setShowRxModal={(val) => handleOpenModal(() => { setShowRxModal(val); setRxBrowseView('search'); })} setShowAddMasterDrugModal={(val) => handleOpenModal(() => setShowAddMasterDrugModal(val))} openConfirm={openConfirm} setPrintingDocument={setPrintingDocument} isSecretary={!!activeSecretaryId} />}
+             {currentView === 'calendar' && <CalendarView t={currentT} data={data} currentLang={deviceLang} isRTL={isRTL} calendarView={calendarView} setCalendarView={setCalendarView} currentDate={currentDate} setCurrentDate={setCurrentDate} filteredAppointments={allAppointments} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowAppointmentModal={(val) => handleOpenModal(() => setShowAppointmentModal(val))} handleUpdateAppointmentStatus={(pid, aid, s) => updatePatient(pid, { appointments: data.patients.find(p=>p.id===pid)!.appointments.map(x=>x.id===aid?{...x,status:s,updatedAt:Date.now()}:x) })} handleDeleteAppointment={(pid, aid) => updatePatient(pid, { appointments: data.patients.find(p=>p.id===pid)!.appointments.filter(x=>x.id!==aid) })} setSelectedPatientId={handleOpenPatient} setCurrentView={setCurrentView} setPatientTab={setPatientTab} setGuestToConvert={setGuestToConvert} setShowNewPatientModal={(val) => handleOpenModal(() => setShowNewPatientModal(val))} openConfirm={openConfirm} setData={setData} activeDoctorId={activeDoctorId} isSecretary={!!activeSecretaryId} />}
+             {currentView === 'memos' && <MemosView t={currentT} data={data} setSelectedMemo={setSelectedMemo} setShowMemoModal={(val) => handleOpenModal(() => setShowMemoModal(val))} setMemoType={setMemoType} setTempTodos={setTempTodos} handleDeleteMemo={(id) => updateLocalData(p => ({...p, memos: p.memos.filter(x => x.id !== id)}))} currentLang={deviceLang} openConfirm={openConfirm} />}
+             {currentView === 'purchases' && <PurchasesView t={currentT} data={data} setSelectedSupply={setSelectedSupply} setShowSupplyModal={(val) => handleOpenModal(() => setShowSupplyModal(val))} handleConvertToExpense={(s) => updateLocalData(p => ({...p, expenses: [{...s, date: new Date().toISOString(), updatedAt: Date.now()}, ...p.expenses], supplies: p.supplies.filter(x=>x.id!==s.id)}))} handleDeleteSupply={(id) => updateLocalData(p => ({...p, supplies: p.supplies.filter(x=>x.id!==id)}))} openConfirm={openConfirm} />}
+             {currentView === 'inventory' && <InventoryView t={currentT} data={data} setSelectedInventoryItem={setSelectedInventoryItem} setShowInventoryModal={(val) => handleOpenModal(() => setShowInventoryModal(val))} handleDeleteInventoryItem={(id) => updateLocalData(p => ({...p, inventory: p.inventory.filter(x => x.id !== id)}))} openConfirm={openConfirm} />}
+             {currentView === 'expenses' && <ExpensesView t={currentT} data={data} setData={setData} setSelectedExpense={setSelectedExpense} setShowExpenseModal={(val) => handleOpenModal(() => setShowExpenseModal(val))} handleDeleteExpense={(id) => updateLocalData(p => ({...p, expenses: p.expenses.filter(x => x.id !== id)}))} openConfirm={openConfirm} />}
+             {currentView === 'labOrders' && <LabOrdersView t={currentT} data={data} setData={setData} setSelectedLabOrder={setSelectedLabOrder} setShowLabOrderModal={(val) => handleOpenModal(() => setShowLabOrderModal(val))} handleDeleteLabOrder={(id) => updateLocalData(p => ({...p, labOrders: p.labOrders.filter(x => x.id !== id)}))} handleUpdateLabOrderStatus={(id, s) => updateLocalData(p => ({...p, labOrders: p.labOrders.map(o => o.id === id ? {...o, status: s, updatedAt: Date.now()} : o)}))} openConfirm={openConfirm} currentLang={deviceLang} />}
+             {currentView === 'settings' && <SettingsView t={currentT} data={data} setData={setData} handleAddDoctor={(n,u,p) => updateLocalData(prev => ({...prev, doctors: [...prev.doctors, {id: Date.now().toString(), name: n, username: u, password: p, updatedAt: Date.now()}]}))} handleUpdateDoctor={(id, u, f) => { if(f) { localStorage.clear(); window.location.reload(); } else updateLocalData(prev => ({...prev, doctors: prev.doctors.map(d => d.id === id ? {...d, ...u, updatedAt: Date.now()} : d)})); }} handleDeleteDoctor={(id, dp) => updateLocalData(prev => ({...prev, patients: dp ? prev.patients.filter(p => p.doctorId !== id) : prev.patients, doctors: prev.doctors.filter(d => d.id !== id)}))} handleAddSecretary={(n,u,p) => updateLocalData(prev => ({...prev, secretaries: [...(prev.secretaries||[]), {id: Date.now().toString(), name: n, username: u, password: p||'123456', updatedAt: Date.now()}]}))} handleDeleteSecretary={(id) => updateLocalData(prev => ({...prev, secretaries: prev.secretaries.filter(s => s.id !== id)}))} handleRxFileUpload={handleRxFileUpload} handleRemoveRxBg={handleRemoveRxBg} handleImportData={async (e, m) => { const imp = await storageService.importBackup(e.target.files![0]); if(imp) { if(m==='replace') setData(mergeDataWithLocalPrefs({...imp, settings: {...imp.settings, isLoggedIn: true}})); else setData(p => ({...p, patients: [...p.patients, ...imp.patients], lastUpdated: Date.now()})); alert('Done'); } }} syncStatus={syncStatus} deferredPrompt={deferredPrompt} handleInstallApp={handleInstallApp} openConfirm={confirmState.isOpen} currentLang={deviceLang} setDeviceLang={setDeviceLang} currentTheme={activeThemeId==='classic'?'light':'dark'} setLocalTheme={(t) => setActiveThemeId(t==='dark'?'dark-pro':'classic')} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} activeDoctorId={activeDoctorId} activeSecretaryId={activeSecretaryId} deviceScale={deviceScale} setDeviceScale={setDeviceScale} onLinkDrive={()=>{}} />}
          </div>
       </main>
 
       <PrintLayouts t={currentT} data={data} activePatient={activePatient} printingRx={printingRx} setPrintingRx={setPrintingRx} printingPayment={printingPayment} setPrintingPayment={setPrintingPayment} printingAppointment={printingAppointment} setPrintingAppointment={setPrintingAppointment} printingDocument={printingDocument} setPrintingDocument={setPrintingDocument} printingExamination={printingExamination} setPrintingExamination={setPrintingExamination} currentLang={deviceLang} isRTL={isRTL} />
-      <PatientModal show={showNewPatientModal || showEditPatientModal} onClose={() => { setShowNewPatientModal(false); setShowEditPatientModal(false); }} t={currentT} isRTL={isRTL} currentLang={deviceLang} data={data} handleAddPatient={(pData: any) => { const ts = Date.now(); const newP = { ...pData, id: ts.toString(), createdAt: new Date().toISOString(), updatedAt: ts, teeth: {}, appointments: [], payments: [], notes: '', rootCanals: [], treatmentSessions: [], prescriptions: [] }; updateLocalData(p => ({...p, patients: [newP, ...p.patients]})); return newP; }} updatePatient={updatePatient} guestToConvert={guestToConvert} activePatient={showEditPatientModal ? activePatient : null} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} activeDoctorId={activeDoctorId} />
+      <PatientModal show={showNewPatientModal || showEditPatientModal} onClose={() => { setShowNewPatientModal(false); setShowEditPatientModal(false); }} t={currentT} isRTL={isRTL} currentLang={deviceLang} data={data} handleAddPatient={(pData: any) => { const ts = Date.now(); const newP = { ...pData, id: ts.toString(), createdAt: new Date().toISOString(), updatedAt: ts, teeth: {}, appointments: [], payments: [], notes: '', rootCanals: [], treatmentSessions: [], prescriptions: [] }; updateLocalData(p => ({...p, patients: [newP, ...p.patients]})); return newP; }} updatePatient={updatePatient} guestToConvert={guestToConvert} activePatient={showEditPatientModal ? activePatient : null} setSelectedPatientId={handleOpenPatient} setCurrentView={setCurrentView} setPatientTab={setPatientTab} activeDoctorId={activeDoctorId} />
       <PaymentModal show={showPaymentModal} onClose={() => setShowPaymentModal(false)} t={currentT} activePatient={activePatient} paymentType={paymentType} data={data} handleSavePayment={(p: any) => handleAddPayment(activePatient!.id, p.amount, p.type, p.description)} currentLang={deviceLang} />
       <AppointmentModal show={showAppointmentModal} onClose={() => { setShowAppointmentModal(false); setApptPatientId(null); }} t={currentT} selectedAppointment={selectedAppointment} appointmentMode={appointmentMode} setAppointmentMode={setAppointmentMode} selectedPatientId={apptPatientId || (selectedPatientId && currentView === 'patients' ? selectedPatientId : null)} data={data} currentDate={currentDate} handleAddAppointment={handleAddAppointment} isRTL={isRTL} currentLang={deviceLang} />
-      <AddMasterDrugModal show={showAddMasterDrugModal} onClose={() => setShowAddMasterDrugModal(false)} t={currentT} data={data} handleManageMedications={(m: any, a: any) => updateLocalData(p => ({...p, medications: a === 'add' ? [...p.medications, {...m, id: Date.now().toString(), updatedAt: Date.now()}] : p.medications.map(x=>x.id===m.id?{...m,updatedAt:Date.now()}:x)}))} handleDeleteMasterDrug={(id) => updateLocalData(p => ({...p, medications: p.medications.filter(x => x.id !== id)}))} currentLang={deviceLang} openConfirm={openConfirm} />
+      <AddMasterDrugModal show={showAddMasterDrugModal} onClose={() => setShowAddMasterDrugModal(false)} t={currentT} data={data} setData={setData} handleManageMedications={(m: any, a: any) => updateLocalData(p => ({...p, medications: a === 'add' ? [...p.medications, {...m, id: Date.now().toString(), updatedAt: Date.now()}] : p.medications.map(x=>x.id===m.id?{...m,updatedAt:Date.now()}:x)}))} handleDeleteMasterDrug={(id) => updateLocalData(p => ({...p, medications: p.medications.filter(x => x.id !== id)}))} currentLang={deviceLang} openConfirm={openConfirm} />
       <MemoModal show={showMemoModal} onClose={() => setShowMemoModal(false)} t={currentT} selectedMemo={selectedMemo} memoType={memoType} setMemoType={setMemoType} tempTodos={tempTodos} setTempTodos={setTempTodos} handleSaveMemo={handleSaveMemo} currentLang={deviceLang} />
       <SupplyModal show={showSupplyModal} onClose={() => setShowSupplyModal(false)} t={currentT} selectedSupply={selectedSupply} handleSaveSupply={(n: any, q: any, pr: any) => { const ts = Date.now(); updateLocalData(p => ({...p, supplies: selectedSupply ? p.supplies.map(x=>x.id===selectedSupply.id?{...x,name:n,quantity:q,price:pr,updatedAt:ts}:x) : [{id:ts.toString(),name:n,quantity:q,price:pr,updatedAt:ts},...p.supplies]})); }} currentLang={deviceLang} />
       <InventoryModal show={showInventoryModal} onClose={() => setShowInventoryModal(false)} t={currentT} selectedItem={selectedInventoryItem} handleSaveItem={(i: any) => { const ts = Date.now(); updateLocalData(p => ({...p, inventory: selectedInventoryItem ? p.inventory.map(x=>x.id===selectedInventoryItem.id?{...x,...i,updatedAt:ts}:x) : [{...i,id:ts.toString(),updatedAt:ts},...p.inventory]})); }} currentLang={deviceLang} />
@@ -382,36 +482,132 @@ export default function App() {
       
       {showRxModal && (
         <div className="fixed inset-0 bg-black/50 z-[150] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-           <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-3xl shadow-2xl p-6 h-[80vh] flex flex-col`} dir={isRTL ? 'rtl' : 'ltr'}>
-              <div className="flex justify-between items-center mb-6">
+           <div className={`bg-white dark:bg-gray-800 w-full max-w-2xl rounded-3xl shadow-2xl p-6 h-[85vh] flex flex-col`} dir={isRTL ? 'rtl' : 'ltr'}>
+              <div className="flex justify-between items-center mb-4">
                   <h3 className="text-xl font-bold dark:text-white flex items-center gap-2"><Pill className="text-primary-600" /> {currentT.newPrescription}</h3>
-                  <button onClick={() => setShowRxModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X size={20} className="text-gray-500" /></button>
+                  <button onClick={() => setShowRxModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition"><X size={20} className="text-gray-500" /></button>
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  <div className="space-y-4 mb-6">
-                      <div className="relative">
-                          <Search className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-4' : 'left-4'} text-gray-400`} size={20} />
-                          <input value={medSearch} onChange={(e) => setMedSearch(e.target.value)} autoComplete="off" className={`w-full ${isRTL ? 'pr-12' : 'pl-12'} py-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none`} placeholder={currentT.drugName} />
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <input value={medForm.dose || ''} onChange={e => setMedForm({...medForm, dose: e.target.value})} dir="ltr" placeholder={currentT.dose} className="p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none text-end" />
-                          <input value={medForm.frequency || ''} onChange={e => setMedForm({...medForm, frequency: e.target.value})} dir="ltr" placeholder={currentT.frequency} className="p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none text-end" />
-                          <input value={medForm.form || ''} onChange={e => setMedForm({...medForm, form: e.target.value})} placeholder={currentT.form} className="p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" />
-                          <input value={medForm.notes || ''} onChange={e => setMedForm({...medForm, notes: e.target.value})} placeholder={currentT.medNotes} className="p-3 rounded-xl border dark:bg-gray-700 dark:text-white outline-none" />
-                      </div>
-                      <button onClick={() => { if(!medSearch && !medForm.name) return; setNewRxMeds([...newRxMeds, {id: Date.now().toString(), name: medSearch || medForm.name!, dose: medForm.dose||'', frequency: medForm.frequency||'', form: medForm.form||'', notes: medForm.notes}]); setMedSearch(''); setMedForm({}); }} className="w-full py-3 bg-primary-600 text-white font-bold rounded-xl shadow-md">+ {currentT.addMedication}</button>
-                  </div>
-                  <div className="space-y-3">
-                      {newRxMeds.map((m, i) => (
-                        <div key={i} className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100">
-                          <div><div className="font-bold dark:text-white">{m.name}</div><div className="text-xs text-blue-600" dir="ltr">{m.dose} • {m.frequency}</div></div>
-                          <button onClick={() => setNewRxMeds(newRxMeds.filter((_, idx)=>idx!==i))} className="text-red-500"><Trash2 size={18}/></button>
+
+              {/* Tabs for Rx Search and Browsing Groups */}
+              <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl mb-4 shrink-0 shadow-inner">
+                  <button onClick={() => setRxBrowseView('search')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition flex items-center justify-center gap-2 ${rxBrowseView === 'search' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary-600' : 'text-gray-500'}`}>
+                      <Search size={16}/> {currentT.searchMedications}
+                  </button>
+                  <button onClick={() => setRxBrowseView('groups')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition flex items-center justify-center gap-2 ${rxBrowseView !== 'search' ? 'bg-white dark:bg-gray-600 shadow-sm text-primary-600' : 'text-gray-500'}`}>
+                      <LayoutGrid size={16}/> {currentT.browseGroups}
+                  </button>
+              </div>
+
+              <div className="flex-1 overflow-hidden flex flex-col">
+                  {rxBrowseView === 'search' ? (
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div className="space-y-4 mb-4 shrink-0">
+                            <div className="relative">
+                                <div className="relative">
+                                    <Search className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-4' : 'left-4'} text-gray-400`} size={20} />
+                                    <input 
+                                        value={medSearch} 
+                                        onChange={(e) => setMedSearch(e.target.value)} 
+                                        autoComplete="off" 
+                                        className={`w-full ${isRTL ? 'pr-12 pl-4' : 'pl-12 pr-4'} py-3.5 rounded-2xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none focus:border-primary-500 transition font-bold`} 
+                                        placeholder={currentT.searchMedications} 
+                                    />
+                                </div>
+                                
+                                {/* Search Results Preview - Now constrained to input container width */}
+                                {medSearch.trim().length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 z-[160] mt-2 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 max-h-48 overflow-y-auto custom-scrollbar animate-scale-up">
+                                        {filteredMedsForSearch.length > 0 ? (
+                                            filteredMedsForSearch.map(med => (
+                                                <button 
+                                                    key={med.id} 
+                                                    onClick={() => { 
+                                                        setNewRxMeds([...newRxMeds, { ...med, id: Date.now().toString() }]); 
+                                                        setMedSearch(''); 
+                                                    }} 
+                                                    className="w-full text-start p-4 hover:bg-primary-50 dark:hover:bg-primary-900/20 border-b last:border-0 border-gray-50 dark:border-gray-700 flex items-center justify-between group transition-colors"
+                                                >
+                                                    <div>
+                                                        <div className="font-black text-gray-800 dark:text-white group-hover:text-primary-600">{med.name}</div>
+                                                        <div className="text-[10px] text-gray-400 font-bold uppercase">{med.dose} • {med.form}</div>
+                                                    </div>
+                                                    <Plus size={14} className="text-gray-300 group-hover:text-primary-500" />
+                                                </button>
+                                            ))
+                                        ) : (
+                                            <div className="p-4 text-center text-xs text-gray-400 italic font-bold">{currentT.noMedicationsFound}</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <input value={medForm.dose || ''} onChange={e => setMedForm({...medForm, dose: e.target.value})} dir="ltr" placeholder={currentT.dose} className="p-3.5 rounded-xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none font-bold text-end" />
+                                <input value={medForm.frequency || ''} onChange={e => setMedForm({...medForm, frequency: e.target.value})} dir="ltr" placeholder={currentT.frequency} className="p-3.5 rounded-xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none font-bold text-end" />
+                                <input value={medForm.form || ''} onChange={e => setMedForm({...medForm, form: e.target.value})} placeholder={currentT.form} className="p-3.5 rounded-xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none font-bold" />
+                                <input value={medForm.notes || ''} onChange={e => setMedForm({...medForm, notes: e.target.value})} placeholder={currentT.medNotes} className="p-3.5 rounded-xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none font-bold" />
+                            </div>
+                            <button onClick={() => { if(!medSearch && !medForm.name) return; setNewRxMeds([...newRxMeds, {id: Date.now().toString(), name: medSearch || medForm.name!, dose: medForm.dose||'', frequency: medForm.frequency||'', form: medForm.form||'', notes: medForm.notes}]); setMedSearch(''); setMedForm({}); }} className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl hover:bg-primary-700 transition transform active:scale-95 flex items-center justify-center gap-2"> <Plus size={20} /> {currentT.addMedication}</button>
                         </div>
-                      ))}
-                  </div>
+                      </div>
+                  ) : rxBrowseView === 'groups' ? (
+                      <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+                          <div className="grid grid-cols-2 gap-3">
+                              {(data.medicationCategories || []).map(cat => (
+                                  <button key={cat.id} onClick={() => { setActiveGroupId(cat.id); setRxBrowseView('group_meds'); }} className="p-6 bg-gray-50 dark:bg-gray-700 border-2 border-transparent hover:border-primary-400 hover:bg-white dark:hover:bg-gray-600 transition rounded-3xl flex flex-col items-center gap-3 group text-center shadow-sm">
+                                      <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all shadow-inner"><Folder size={32}/></div>
+                                      <span className="font-black text-gray-800 dark:text-white text-sm leading-tight">{cat.name}</span>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                  ) : (
+                      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                          <button onClick={() => setRxBrowseView('groups')} className="mb-4 text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 hover:text-primary-600 transition">
+                              <ArrowLeft size={16} className="rtl:rotate-180" /> {currentT.back}
+                          </button>
+                          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 p-1">
+                              {data.medications.filter(m => m.categoryId === activeGroupId).length === 0 ? (
+                                  <div className="text-center py-10 opacity-30 font-bold">{currentT.noMedicationsFound}</div>
+                              ) : (
+                                  data.medications.filter(m => m.categoryId === activeGroupId).map(med => (
+                                      <button key={med.id} onClick={() => { setNewRxMeds([...newRxMeds, { ...med, id: Date.now().toString() }]); }} className="w-full text-start p-4 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-2xl hover:border-primary-300 transition flex items-center justify-between group shadow-sm">
+                                          <div>
+                                              <div className="font-black text-gray-800 dark:text-white text-lg">{med.name}</div>
+                                              <div className="text-xs text-gray-500 font-bold mt-1" dir="ltr">{med.dose} • {med.frequency} • {med.form}</div>
+                                          </div>
+                                          <div className="p-2 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"><Plus size={18}/></div>
+                                      </button>
+                                  ))
+                              )}
+                          </div>
+                      </div>
+                  )}
+
+                  {/* Added Medications Tray */}
+                  {newRxMeds.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col shrink-0">
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{currentT.rxList}</span>
+                            <span className="bg-primary-600 text-white px-2 py-0.5 rounded-full text-[10px] font-black">{newRxMeds.length}</span>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+                            {newRxMeds.map((m, i) => (
+                                <div key={i} className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-100 shrink-0 shadow-sm animate-scale-up">
+                                    <div className="text-start">
+                                        <div className="font-black dark:text-white text-sm whitespace-nowrap leading-none mb-1">{m.name}</div>
+                                        <div className="text-[10px] text-blue-600 font-bold leading-none" dir="ltr">{m.dose} • {m.frequency}</div>
+                                    </div>
+                                    <button onClick={() => setNewRxMeds(newRxMeds.filter((_, idx)=>idx!==i))} className="p-1.5 text-red-500 bg-white dark:bg-gray-800 rounded-lg shadow-sm hover:scale-110 transition-transform"><Trash2 size={14}/></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                  )}
               </div>
-              <div className="pt-4 border-t mt-4">
-                  <button onClick={() => { if(!activePatient) return; const ts = Date.now(); const rx = {id: ts.toString(), date: new Date().toISOString(), medications: newRxMeds, updatedAt: ts}; updatePatient(activePatient.id, { prescriptions: [rx, ...activePatient.prescriptions] }); setShowRxModal(false); setNewRxMeds([]); }} disabled={newRxMeds.length===0} className="w-full bg-primary-600 text-white py-4 rounded-xl font-bold shadow-lg disabled:opacity-50">{currentT.save}</button>
+
+              <div className="pt-4 border-t border-gray-100 dark:border-gray-700 mt-4 shrink-0">
+                  <button onClick={() => { if(!activePatient) return; const ts = Date.now(); const rx = {id: ts.toString(), date: new Date().toISOString(), medications: newRxMeds, updatedAt: ts}; updatePatient(activePatient.id, { prescriptions: [rx, ...activePatient.prescriptions] }); setShowRxModal(false); setNewRxMeds([]); }} disabled={newRxMeds.length===0} className="w-full bg-primary-600 text-white py-5 rounded-[2rem] font-black text-xl shadow-xl shadow-primary-500/30 disabled:opacity-50 transition transform active:scale-95 flex items-center justify-center gap-3"> <CheckCircle2 size={24}/> {currentT.save} </button>
               </div>
            </div>
         </div>

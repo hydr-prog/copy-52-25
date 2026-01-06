@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Plus, Search, Trash2, Edit2, Pill, ArrowLeft, Save, DollarSign, FileText, ListTodo, AlignLeft, AlignRight, Italic, Heading, Type } from 'lucide-react';
+import { X, Check, Plus, Search, Trash2, Edit2, Pill, ArrowLeft, Save, DollarSign, FileText, ListTodo, AlignLeft, AlignRight, Italic, Heading, Type, Folder, LayoutGrid, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { MEMO_COLORS } from '../../constants';
-import { TodoItem, Medication, MemoStyle } from '../../types';
+import { TodoItem, Medication, MemoStyle, MedicationCategory } from '../../types';
 
 const TodoListBuilder = ({ initialTodos, onChange, t }: { initialTodos: TodoItem[], onChange: (todos: TodoItem[]) => void, t: any }) => {
     const [todos, setTodos] = useState<TodoItem[]>(initialTodos);
@@ -169,51 +169,156 @@ export const MemoModal = ({ show, onClose, t, selectedMemo, memoType, setMemoTyp
     );
 };
 
-export const AddMasterDrugModal = ({ show, onClose, t, data, handleManageMedications, handleDeleteMasterDrug, currentLang, openConfirm }: any) => {
+export const AddMasterDrugModal = ({ show, onClose, t, data, setData, handleManageMedications, handleDeleteMasterDrug, currentLang, openConfirm }: any) => {
     const isRTL = currentLang === 'ar' || currentLang === 'ku';
     const fontClass = isRTL ? 'font-cairo' : 'font-sans';
+    const [activeTab, setActiveTab] = useState<'meds' | 'groups'>('meds');
     const [view, setView] = useState<'list' | 'form'>('list');
     const [searchQuery, setSearchQuery] = useState('');
     const [editingDrug, setEditingDrug] = useState<Medication | null>(null);
-    useEffect(() => { if (!show) { setView('list'); setSearchQuery(''); setEditingDrug(null); } }, [show]);
+    const [editingGroup, setEditingGroup] = useState<MedicationCategory | null>(null);
+
+    useEffect(() => { if (!show) { setView('list'); setSearchQuery(''); setEditingDrug(null); setEditingGroup(null); setActiveTab('meds'); } }, [show]);
+    
     if (!show) return null;
+
     const filteredMeds = (data.medications || []).filter((m: Medication) => m.name.toLowerCase().includes(searchQuery.toLowerCase()) );
+    const categories = data.medicationCategories || [];
+
+    const handleSaveGroup = (e: React.FormEvent) => {
+        e.preventDefault();
+        const fd = new FormData(e.currentTarget as HTMLFormElement);
+        const name = fd.get('groupName') as string;
+        if (!name.trim()) return;
+
+        setData((prev: any) => {
+            const timestamp = Date.now();
+            const currentCats = prev.medicationCategories || [];
+            if (editingGroup) {
+                return { ...prev, lastUpdated: timestamp, medicationCategories: currentCats.map((c: any) => c.id === editingGroup.id ? { ...c, name, updatedAt: timestamp } : c) };
+            } else {
+                return { ...prev, lastUpdated: timestamp, medicationCategories: [{ id: 'cat_' + timestamp, name, updatedAt: timestamp }, ...currentCats] };
+            }
+        });
+        setView('list'); setEditingGroup(null);
+    };
+
+    const handleDeleteGroup = (id: string) => {
+        openConfirm(t.deleteDrugGroup, isRTL ? "هل تريد حذف هذه المجموعة؟ لن يتم حذف الأدوية بداخلها بل سيتم نقلها لغير مصنف." : "Delete this group? Medications inside will be moved to uncategorized.", () => {
+            setData((prev: any) => ({
+                ...prev,
+                lastUpdated: Date.now(),
+                medications: (prev.medications || []).map((m: any) => m.categoryId === id ? { ...m, categoryId: undefined } : m),
+                medicationCategories: (prev.medicationCategories || []).filter((c: any) => c.id !== id)
+            }));
+        });
+    };
 
     return createPortal(
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in" style={{zIndex: 9999}}>
-            <div className={`bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl shadow-2xl p-6 h-[80vh] flex flex-col ${fontClass}`} dir={isRTL ? 'rtl' : 'ltr'}>
-                <div className="flex justify-between items-center mb-6 shrink-0"> <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2"> <Pill className="text-primary-600" /> {view === 'list' ? t.addMasterDrug : (editingDrug ? t.editItem : t.addMedication)} </h3> <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X size={20} className="text-gray-500" /></button> </div>
-                {view === 'list' ? (
-                    <div className="flex flex-col flex-1 overflow-hidden min-h-0">
-                        <div className="flex gap-2 mb-4 shrink-0">
-                            <div className="relative flex-1"> <Search className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3' : 'left-3'} text-gray-400`} size={18} /> <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t.searchMedications} autoComplete="off" className={`w-full py-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none ${isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4'}`} /> </div>
-                            <button onClick={() => { setEditingDrug(null); setView('form'); }} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl shadow-md transition"> <Plus size={20} /> </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 p-1">
-                            {filteredMeds.length === 0 ? ( <div className="text-center py-10 text-gray-400"> <Pill size={40} className="mx-auto mb-2 opacity-30" /> <p>{t.noMedicationsFound}</p> </div> ) : ( filteredMeds.map((med: Medication) => ( <div key={med.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-600 flex justify-between items-start group hover:border-primary-200 dark:hover:border-primary-500 transition"> <div> <div className="font-bold text-gray-800 dark:text-white text-lg">{med.name}</div> <div className="flex flex-wrap gap-2 mt-1"> {med.dose && <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-md font-medium" dir="ltr">{med.dose}</span>} {med.form && <span className="text-xs bg-purple-100 dark:bg-blue-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-md font-medium">{med.form}</span>} {med.frequency && <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1" dir="ltr"> • {med.frequency}</span>} </div> {med.notes && <div className="text-xs text-gray-400 mt-1 italic">"{med.notes}"</div>} </div> <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"> <button onClick={() => { setEditingDrug(med); setView('form'); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"> <Edit2 size={18} /> </button> <button onClick={() => openConfirm(t.manageMedications, t.deleteMedicationConfirm, () => handleDeleteMasterDrug(med.id))} className="p-2 text-red-500 hover:bg-red-900/20 rounded-lg"> <Trash2 size={18} /> </button> </div> </div> )) )}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex-1 flex flex-col min-h-0">
-                        <button onClick={() => setView('list')} className="mb-4 text-sm font-bold text-gray-500 hover:text-primary-600 flex items-center gap-1 w-fit shrink-0"> <ArrowLeft size={16} className="rtl:rotate-180" /> {t.back} </button>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const fd = new FormData(e.currentTarget);
-                            handleManageMedications({ id: editingDrug ? editingDrug.id : '', name: fd.get('name') as string, dose: fd.get('dose') as string, frequency: fd.get('frequency') as string, form: fd.get('form') as string, notes: fd.get('notes') as string }, editingDrug ? 'update' : 'add');
-                            setView('list');
-                        }} className="flex flex-col flex-1 min-h-0">
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-1 space-y-4">
-                                <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.drugName} *</label> <input name="name" defaultValue={editingDrug?.name} placeholder={t.drugName} required autoComplete="off" className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none focus:ring-2 focus:ring-primary-500 transition" /> </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.dose}</label> <input name="dose" defaultValue={editingDrug?.dose} dir="ltr" placeholder="500mg" autoComplete="off" className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none text-end" /> </div>
-                                    <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.form}</label> <input name="form" defaultValue={editingDrug?.form} placeholder="Tab, Cap..." autoComplete="off" className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none" /> </div>
-                                </div>
-                                <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.frequency}</label> <input name="frequency" defaultValue={editingDrug?.frequency} dir="ltr" placeholder="1 x 3" autoComplete="off" className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none text-end" /> </div>
-                                <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.medNotes}</label> <input name="notes" defaultValue={editingDrug?.notes} placeholder={t.medNotes} autoComplete="off" className="w-full p-3 rounded-xl border dark:bg-gray-700 dark:text-white dark:border-gray-600 outline-none" /> </div>
+            <div className={`bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl shadow-2xl p-6 h-[85vh] flex flex-col ${fontClass}`} dir={isRTL ? 'rtl' : 'ltr'}>
+                <div className="flex justify-between items-center mb-6 shrink-0"> 
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2"> 
+                        <Pill className="text-primary-600" /> {t.addMasterDrug} 
+                    </h3> 
+                    <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition"><X size={20} className="text-gray-500" /></button> 
+                </div>
+
+                <div className="flex bg-gray-100 dark:bg-gray-700 p-1.5 rounded-2xl mb-6 shrink-0 shadow-inner">
+                    <button onClick={() => { setActiveTab('meds'); setView('list'); }} className={`flex-1 py-3 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 ${activeTab === 'meds' ? 'bg-white dark:bg-gray-600 shadow-md text-primary-600' : 'text-gray-500'}`}>
+                        <Pill size={18}/> {t.meds}
+                    </button>
+                    <button onClick={() => { setActiveTab('groups'); setView('list'); }} className={`flex-1 py-3 rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 ${activeTab === 'groups' ? 'bg-white dark:bg-gray-600 shadow-md text-primary-600' : 'text-gray-500'}`}>
+                        <Folder size={18}/> {t.drugGroups}
+                    </button>
+                </div>
+
+                {activeTab === 'meds' ? (
+                    view === 'list' ? (
+                        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+                            <div className="flex gap-2 mb-4 shrink-0">
+                                <div className="relative flex-1"> <Search className={`absolute top-1/2 -translate-y-1/2 ${isRTL ? 'right-3' : 'left-3'} text-gray-400`} size={18} /> <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t.searchMedications} autoComplete="off" className={`w-full py-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none ${isRTL ? 'pr-10 pl-4' : 'pl-10 pr-4'}`} /> </div>
+                                <button onClick={() => { setEditingDrug(null); setView('form'); }} className="bg-primary-600 hover:bg-primary-700 text-white p-3 rounded-xl shadow-md transition"> <Plus size={20} /> </button>
                             </div>
-                            <div className="pt-4 mt-2 shrink-0"> <button type="submit" className="w-full py-3 bg-primary-600 text-white font-bold rounded-xl shadow-lg hover:bg-primary-700 transition flex items-center justify-center gap-2"> <Save size={18} /> {t.save} </button> </div>
-                        </form>
-                    </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 p-1">
+                                {filteredMeds.length === 0 ? ( <div className="text-center py-10 text-gray-400"> <Pill size={40} className="mx-auto mb-2 opacity-30" /> <p>{t.noMedicationsFound}</p> </div> ) : ( filteredMeds.map((med: Medication) => {
+                                    const cat = categories.find(c => c.id === med.categoryId);
+                                    return ( <div key={med.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-100 dark:border-gray-600 flex justify-between items-start group hover:border-primary-200 dark:hover:border-primary-500 transition"> <div> <div className="font-bold text-gray-800 dark:text-white text-lg">{med.name}</div> <div className="flex flex-wrap gap-2 mt-1"> {cat && <span className="text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-md font-black uppercase tracking-tighter shadow-inner flex items-center gap-1"><Folder size={10}/> {cat.name}</span>} {med.dose && <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-md font-medium" dir="ltr">{med.dose}</span>} {med.form && <span className="text-xs bg-purple-100 dark:bg-blue-900/40 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded-md font-medium">{med.form}</span>} </div> {med.notes && <div className="text-xs text-gray-400 mt-1 italic">"{med.notes}"</div>} </div> <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"> <button onClick={() => { setEditingDrug(med); setView('form'); }} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"> <Edit2 size={18} /> </button> <button onClick={() => openConfirm(t.manageMedications, t.deleteMedicationConfirm, () => handleDeleteMasterDrug(med.id))} className="p-2 text-red-500 hover:bg-red-900/20 rounded-lg"> <Trash2 size={18} /> </button> </div> </div> );
+                                }) )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col min-h-0">
+                            <button onClick={() => setView('list')} className="mb-4 text-sm font-bold text-gray-500 hover:text-primary-600 flex items-center gap-1 w-fit shrink-0"> <ArrowLeft size={16} className="rtl:rotate-180" /> {t.back} </button>
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const fd = new FormData(e.currentTarget as HTMLFormElement);
+                                handleManageMedications({ id: editingDrug ? editingDrug.id : '', name: fd.get('name') as string, dose: fd.get('dose') as string, frequency: fd.get('frequency') as string, form: fd.get('form') as string, notes: fd.get('notes') as string, categoryId: fd.get('categoryId') as string }, editingDrug ? 'update' : 'add');
+                                setView('list');
+                            }} className="flex flex-col flex-1 min-h-0">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-1 space-y-4">
+                                    <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.drugName} *</label> <input name="name" defaultValue={editingDrug?.name} placeholder={t.drugName} required autoComplete="off" className="w-full p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none focus:border-primary-500 transition font-bold" /> </div>
+                                    <div> 
+                                        <label className="block text-xs font-bold text-gray-500 mb-1">{t.drugGroups}</label> 
+                                        <select name="categoryId" defaultValue={editingDrug?.categoryId || ''} className="w-full p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none focus:border-primary-500 transition font-bold appearance-none">
+                                            <option value="">{isRTL ? "غير مصنف" : "Uncategorized"}</option>
+                                            {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.dose}</label> <input name="dose" defaultValue={editingDrug?.dose} dir="ltr" placeholder="500mg" autoComplete="off" className="w-full p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none text-end font-bold" /> </div>
+                                        <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.form}</label> <input name="form" defaultValue={editingDrug?.form} placeholder="Tab, Cap..." autoComplete="off" className="w-full p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none font-bold" /> </div>
+                                    </div>
+                                    <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.frequency}</label> <input name="frequency" defaultValue={editingDrug?.frequency} dir="ltr" placeholder="1 x 3" autoComplete="off" className="w-full p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none text-end font-bold" /> </div>
+                                    <div> <label className="block text-xs font-bold text-gray-500 mb-1">{t.medNotes}</label> <input name="notes" defaultValue={editingDrug?.notes} placeholder={t.medNotes} autoComplete="off" className="w-full p-4 rounded-2xl border-2 border-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none font-medium" /> </div>
+                                </div>
+                                <div className="pt-4 mt-2 shrink-0"> <button type="submit" className="w-full py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition flex items-center justify-center gap-2 transform active:scale-95"> <Save size={20} /> {t.save} </button> </div>
+                            </form>
+                        </div>
+                    )
+                ) : (
+                    // Drug Groups Management
+                    view === 'list' ? (
+                        <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+                            <button onClick={() => { setEditingGroup(null); setView('form'); }} className="w-full mb-6 py-4 bg-primary-600 text-white rounded-2xl font-black shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition flex items-center justify-center gap-2 transform active:scale-95">
+                                <Plus size={20} /> {t.addDrugGroup}
+                            </button>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 p-1">
+                                {categories.length === 0 ? (
+                                    <div className="text-center py-20 text-gray-400 border-2 border-dashed rounded-[2rem]">
+                                        <Folder size={48} className="mx-auto mb-4 opacity-20" />
+                                        <p>{isRTL ? "لا توجد مجموعات دوائية بعد." : "No drug groups yet."}</p>
+                                    </div>
+                                ) : (
+                                    categories.map((cat: MedicationCategory) => (
+                                        <div key={cat.id} className="flex items-center justify-between p-5 bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-700 rounded-3xl hover:shadow-md transition group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-2xl flex items-center justify-center shadow-inner group-hover:rotate-12 transition-transform"><Folder size={24}/></div>
+                                                <span className="font-black text-gray-800 dark:text-white text-lg">{cat.name}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setEditingGroup(cat); setView('form'); }} className="p-3 text-blue-500 bg-gray-50 dark:bg-gray-800 rounded-xl hover:scale-110 transition-transform"><Edit2 size={18}/></button>
+                                                <button onClick={() => handleDeleteGroup(cat.id)} className="p-3 text-red-500 bg-gray-50 dark:bg-gray-800 rounded-xl hover:scale-110 transition-transform"><Trash2 size={18}/></button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="animate-fade-in">
+                            <button onClick={() => setView('list')} className="mb-4 text-sm font-bold text-gray-500 hover:text-primary-600 flex items-center gap-1 w-fit"> <ArrowLeft size={16} className="rtl:rotate-180" /> {t.back} </button>
+                            <form onSubmit={handleSaveGroup} className="space-y-6">
+                                <div>
+                                    <label className="block text-xs font-black text-gray-400 uppercase mb-2 tracking-widest ms-1">{t.drugGroups}</label>
+                                    <input name="groupName" defaultValue={editingGroup?.name} autoFocus required className="w-full p-5 rounded-2xl border-2 border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 dark:text-white outline-none focus:border-primary-500 font-black text-xl shadow-inner" placeholder={isRTL ? "مثلاً: مضادات حيوية" : "e.g. Antibiotics"} />
+                                </div>
+                                <button type="submit" className="w-full py-5 bg-primary-600 text-white font-black text-xl rounded-2xl shadow-2xl shadow-primary-500/30 hover:bg-primary-700 transition transform active:scale-95 flex items-center justify-center gap-3">
+                                    <Check size={26} /> {t.save}
+                                </button>
+                            </form>
+                        </div>
+                    )
                 )}
             </div>
         </div>, document.body

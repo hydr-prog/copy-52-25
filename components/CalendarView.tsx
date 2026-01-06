@@ -90,26 +90,29 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [calendarFilterDoctor, setCalendarFilterDoctor] = useState<string>('');
   const [calendarFilterGender, setCalendarFilterGender] = useState<string>('');
 
-  const [doctorColors, setDoctorColors] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('dentro_device_doctor_colors');
-    return saved ? JSON.parse(saved) : {};
+  // Separated Colors for Month and Week
+  const [doctorColors, setDoctorColors] = useState<Record<string, Record<string, string>>>(() => {
+    const saved = localStorage.getItem('dentro_device_doctor_colors_v2');
+    return saved ? JSON.parse(saved) : { month: {}, week: {} };
   });
 
-  const [doctorCardColors, setDoctorCardColors] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('dentro_device_doctor_card_colors');
-    return saved ? JSON.parse(saved) : {};
+  const [doctorCardColors, setDoctorCardColors] = useState<Record<string, Record<string, string>>>(() => {
+    const saved = localStorage.getItem('dentro_device_doctor_card_colors_v2');
+    return saved ? JSON.parse(saved) : { month: {}, week: {} };
   });
 
   const updateDoctorColor = (docId: string, color: string) => {
-    const newColors = { ...doctorColors, [docId]: color };
+    const viewKey = calendarView === 'month' ? 'month' : 'week';
+    const newColors = { ...doctorColors, [viewKey]: { ...doctorColors[viewKey], [docId]: color } };
     setDoctorColors(newColors);
-    localStorage.setItem('dentro_device_doctor_colors', JSON.stringify(newColors));
+    localStorage.setItem('dentro_device_doctor_colors_v2', JSON.stringify(newColors));
   };
 
   const updateDoctorCardColor = (docId: string, color: string) => {
-    const newColors = { ...doctorCardColors, [docId]: color };
+    const viewKey = calendarView === 'month' ? 'month' : 'week';
+    const newColors = { ...doctorCardColors, [viewKey]: { ...doctorCardColors[viewKey], [docId]: color } };
     setDoctorCardColors(newColors);
-    localStorage.setItem('dentro_device_doctor_card_colors', JSON.stringify(newColors));
+    localStorage.setItem('dentro_device_doctor_card_colors_v2', JSON.stringify(newColors));
   };
 
   const [monthSettings, setMonthSettings] = useState<MonthViewSettings>(() => {
@@ -162,16 +165,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       return base + (val * multiplier);
   };
 
-  const getPatientColor = (appt: any, defaultColor: string) => {
-      if (appt.patient && appt.patient.doctorId && doctorColors[appt.patient.doctorId]) {
-          return doctorColors[appt.patient.doctorId];
+  const getPatientColor = (appt: any, currentView: 'month' | 'week') => {
+      const defaultColor = currentView === 'month' ? monthSettings.textColor : weekSettings.textColor;
+      if (appt.patient && appt.patient.doctorId && doctorColors[currentView]?.[appt.patient.doctorId]) {
+          return doctorColors[currentView][appt.patient.doctorId];
       }
       return defaultColor;
   };
 
-  const getPatientCardColor = (appt: any, defaultColor: string) => {
-      if (appt.patient && appt.patient.doctorId && doctorCardColors[appt.patient.doctorId]) {
-          return doctorCardColors[appt.patient.doctorId];
+  const getPatientCardColor = (appt: any, currentView: 'month' | 'week') => {
+      const defaultColor = currentView === 'month' ? monthSettings.cardBgColor : weekSettings.cardBgColor;
+      if (appt.patient && appt.patient.doctorId && doctorCardColors[currentView]?.[appt.patient.doctorId]) {
+          return doctorCardColors[currentView][appt.patient.doctorId];
       }
       return defaultColor;
   };
@@ -246,9 +251,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       {(showMonthSettings || showWeekSettings) && (
           <div className="mb-6 bg-white dark:bg-gray-800 p-6 md:p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-2xl animate-fade-in space-y-10 relative z-40">
               <div className="flex items-center justify-between border-b border-gray-50 dark:border-gray-700 pb-4">
-                  <h3 className="font-black text-gray-800 dark:text-white uppercase tracking-tighter flex items-center gap-2">
+                  <h3 className="font-black text-gray-800 dark:text-white uppercase tracking-tighter flex items-center gap-2 text-lg">
                       <Layout size={20} className="text-primary-600" />
-                      {t.calendarSettings}
+                      {t.calendarSettings} - {calendarView === 'month' ? t.month : t.week}
                   </h3>
               </div>
 
@@ -291,40 +296,42 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <div className="flex flex-col mb-8">
                       <h4 className="text-sm font-black text-gray-800 dark:text-white uppercase flex items-center gap-2 tracking-widest">
                           <Palette size={18} className="text-primary-600" />
-                          {isRTL ? "تخصيص ألوان الأطباء (لهذا الجهاز)" : "Doctor Custom Colors (This Device)"}
+                          {isRTL ? `ألوان الأطباء لهذا العرض (${calendarView === 'month' ? t.month : t.week})` : `Doctor Colors for this View (${calendarView === 'month' ? t.month : t.week})`}
                       </h4>
                       <p className="text-[10px] text-gray-400 font-bold mt-1">
-                          {isRTL ? "يمكنك تحديد لون خط ولون خلفية مختلف لكل طبيب لتمييز مرضاه بسهولة." : "Assign unique text and card colors for each doctor to easily identify their patients."}
+                          {isRTL ? "يمكنك تخصيص ألوان مستقلة لهذا العرض الحالي فقط." : "Customize unique colors for this specific view independently."}
                       </p>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {data.doctors.map(doc => (
-                          <div key={doc.id} className="bg-gray-50/50 dark:bg-gray-700/30 p-5 rounded-[2rem] border border-gray-100 dark:border-gray-700 transition-all hover:shadow-md flex flex-col gap-4">
-                              <div className="flex items-center gap-3 border-b border-black/5 pb-3">
-                                  <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-xl flex items-center justify-center shrink-0">
-                                      <Stethoscope size={20} />
+                      {data.doctors.map(doc => {
+                          const viewKey = calendarView === 'month' ? 'month' : 'week';
+                          return (
+                              <div key={doc.id} className="bg-gray-50/50 dark:bg-gray-700/30 p-5 rounded-[2rem] border border-gray-100 dark:border-gray-700 transition-all hover:shadow-md flex flex-col gap-4">
+                                  <div className="flex items-center gap-3 border-b border-black/5 pb-3">
+                                      <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-xl flex items-center justify-center shrink-0">
+                                          <Stethoscope size={20} />
+                                      </div>
+                                      <span className="font-black text-gray-800 dark:text-white truncate">{doc.name}</span>
                                   </div>
-                                  <span className="font-black text-gray-800 dark:text-white truncate">{doc.name}</span>
+                                  <div className="flex justify-around gap-4">
+                                      <CustomColorPicker 
+                                          label={isRTL ? "لون الخط" : "Text Color"} 
+                                          value={doctorColors[viewKey]?.[doc.id] || (calendarView === 'month' ? monthSettings.textColor : weekSettings.textColor)} 
+                                          onChange={(c: string) => updateDoctorColor(doc.id, c)} 
+                                          t={t} 
+                                          isRTL={isRTL} 
+                                      />
+                                      <CustomColorPicker 
+                                          label={isRTL ? "لون الخلفية" : "Card Color"} 
+                                          value={doctorCardColors[viewKey]?.[doc.id] || (calendarView === 'month' ? monthSettings.cardBgColor : weekSettings.cardBgColor)} 
+                                          onChange={(c: string) => updateDoctorCardColor(doc.id, c)} 
+                                          t={t} 
+                                          isRTL={isRTL} 
+                                      />
+                                  </div>
                               </div>
-                              <div className="flex justify-around gap-4">
-                                  <CustomColorPicker 
-                                      label={isRTL ? "لون الخط" : "Text Color"} 
-                                      value={doctorColors[doc.id] || (calendarView === 'month' ? monthSettings.textColor : weekSettings.textColor)} 
-                                      onChange={(c: string) => updateDoctorColor(doc.id, c)} 
-                                      t={t} 
-                                      isRTL={isRTL} 
-                                  />
-                                  <CustomColorPicker 
-                                      label={isRTL ? "لون الخلفية" : "Card Color"} 
-                                      value={doctorCardColors[doc.id] || (calendarView === 'month' ? monthSettings.cardBgColor : weekSettings.cardBgColor)} 
-                                      onChange={(c: string) => updateDoctorCardColor(doc.id, c)} 
-                                      t={t} 
-                                      isRTL={isRTL} 
-                                  />
-                              </div>
-                          </div>
-                      ))}
-                      {data.doctors.length === 0 && <p className="text-xs text-gray-400 italic col-span-full text-center">{t.noDoctors}</p>}
+                          );
+                      })}
                   </div>
               </div>
 
@@ -416,8 +423,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                                 className="truncate w-full px-2 py-1 leading-tight rounded-md border-s-4 border-primary-500 shadow-sm font-bold transition-colors"
                                                 style={{ 
                                                     fontSize: `${monthSettings.fontSize}px`, 
-                                                    color: getPatientColor(appt, monthSettings.textColor),
-                                                    backgroundColor: getPatientCardColor(appt, monthSettings.cardBgColor || 'rgba(255,255,255,0.8)')
+                                                    color: getPatientColor(appt, 'month'),
+                                                    backgroundColor: getPatientCardColor(appt, 'month')
                                                 }}
                                             >
                                                 {appt.patientName}
@@ -451,12 +458,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           className={`p-5 rounded-[2.5rem] border-2 shadow-sm cursor-pointer hover:shadow-md transition min-h-[180px] flex flex-col ${!customDayBg ? colorClass : ''} ${idx === 6 ? 'md:col-span-2' : ''}`}
                           style={customDayBg ? { backgroundColor: customDayBg } : {}}
                       >
-                          <div className={`flex justify-between items-start mb-4 border-b-2 ${customDayBg ? 'border-black/10 dark:border-white/10' : 'border-current/40'} pb-3`}>
-                              <div>
-                                  <div className={`text-xl font-black opacity-100 mb-0.5 ${customDayBg ? 'text-gray-800 dark:text-white' : ''}`}>{getLocalizedDate(day, 'weekday', currentLang)}</div>
-                                  <div className={`text-xs opacity-80 font-bold ${customDayBg ? 'text-gray-500 dark:text-gray-400' : ''}`}>{getLocalizedDate(day, 'full', currentLang)}</div>
+                          <div className={`flex justify-between items-center mb-4 border-b-2 ${customDayBg ? 'border-black/10 dark:border-white/10' : 'border-current/40'} pb-3`}>
+                              <div className="flex items-center gap-2">
+                                  <div className={`text-xl font-black opacity-100 ${customDayBg ? 'text-gray-800 dark:text-white' : ''}`}>
+                                      {getLocalizedDate(day, 'weekday', currentLang)}
+                                  </div>
+                                  <div className={`text-lg font-black bg-white/40 dark:bg-black/20 px-2 py-0.5 rounded-lg border border-current/10 ${customDayBg ? 'text-gray-600 dark:text-gray-300' : ''}`}>
+                                      {format(day, 'M/d')}
+                                  </div>
                               </div>
-                              {isToday && <span className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-[10px] font-black shadow-sm ring-1 ring-black/5">{t.today.toUpperCase()}</span>}
+                              {isToday && <span className="bg-white/90 text-gray-900 px-3 py-1 rounded-full text-[10px] font-black shadow-sm ring-1 ring-black/5 shrink-0">{t.today.toUpperCase()}</span>}
                           </div>
 
                           <div className="flex-1 space-y-2.5">
@@ -468,13 +479,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                                   dayAppointments.map(appt => (
                                       <div key={appt.id} 
                                         className="flex items-center justify-between p-3 rounded-2xl shadow-sm border border-black/5 transition-all hover:scale-[1.02]"
-                                        style={{ backgroundColor: getPatientCardColor(appt, weekSettings.cardBgColor || 'rgba(255,255,255,0.9)') }}
+                                        style={{ backgroundColor: getPatientCardColor(appt, 'week') }}
                                       >
                                           <span 
                                             className="font-black truncate flex-1 pr-2"
                                             style={{ 
                                                 fontSize: `${weekSettings.fontSize}px`, 
-                                                color: getPatientColor(appt, weekSettings.textColor) 
+                                                color: getPatientColor(appt, 'week') 
                                             }}
                                           >
                                               {appt.patientName}

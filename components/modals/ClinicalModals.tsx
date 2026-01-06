@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-// Add missing PlusCircle and FileText imports
-import { X, Check, Save, ArrowLeft, Settings, Image, Layout, ClipboardList, Edit2, Trash2, Printer, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, HelpCircle, Stethoscope, Eye, Upload, Pill, PlusCircle, FileText, Maximize, FileStack } from 'lucide-react';
+import { X, Check, Save, ArrowLeft, Settings, Image, Layout, ClipboardList, Edit2, Trash2, Printer, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Type as TypeIcon, HelpCircle, Stethoscope, Eye, Upload, Pill, PlusCircle, FileText, Maximize, FileStack, Minus, Hash } from 'lucide-react';
 import { MEDICAL_CONDITIONS_LIST, PATIENT_QUESTIONS_LIST } from '../../constants';
-import { ClinicData, DocumentTemplate, MedicalConditionItem, PatientQueryAnswer, TextStyleConfig, DocumentSettings } from '../../types';
+import { ClinicData, DocumentTemplate, MedicalConditionItem, PatientQueryAnswer, TextStyleConfig, DocumentSettings, LineStyleConfig } from '../../types';
 
 const StyleEditor = ({ config, onChange, label, t }: { config: TextStyleConfig, onChange: (c: TextStyleConfig) => void, label: string, t: any }) => {
     return (
@@ -36,6 +35,43 @@ const StyleEditor = ({ config, onChange, label, t }: { config: TextStyleConfig, 
     )
 }
 
+const LineStyleEditor = ({ config, onChange, label, t }: { config: LineStyleConfig, onChange: (c: LineStyleConfig) => void, label: string, t: any }) => {
+    return (
+        <div className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-200 dark:border-gray-600">
+            <h4 className="font-bold text-gray-700 dark:text-gray-200 mb-3 text-sm uppercase flex items-center gap-2">
+                <Minus size={16} /> {label}
+            </h4>
+            <div className="flex flex-wrap gap-6 items-center">
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-500">{t.textColor}</label>
+                    <div className="flex items-center gap-2">
+                        <input type="color" value={config.color} onChange={(e) => onChange({...config, color: e.target.value})} className="w-8 h-8 rounded cursor-pointer border-none bg-transparent" />
+                        <span className="text-xs font-mono text-gray-500">{config.color}</span>
+                    </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-500">{t.lineThickness}</label>
+                    <div className="flex items-center gap-3">
+                        <input type="range" min="0.5" max="10" step="0.5" value={config.thickness} onChange={(e) => onChange({...config, thickness: parseFloat(e.target.value)})} className="w-24 accent-primary-600" />
+                        <span className="text-xs font-bold text-gray-700 dark:text-white">{config.thickness} pt</span>
+                    </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-500">{t.lineStyle}</label>
+                    <div className="flex bg-white dark:bg-gray-800 p-1 rounded-lg border dark:border-gray-600">
+                        <button onClick={() => onChange({...config, style: 'solid'})} className={`px-3 py-1 text-xs font-bold rounded ${config.style === 'solid' ? 'bg-primary-600 text-white shadow' : 'text-gray-500'}`}>{t.solid}</button>
+                        <button onClick={() => onChange({...config, style: 'dashed'})} className={`px-3 py-1 text-xs font-bold rounded ${config.style === 'dashed' ? 'bg-primary-600 text-white shadow' : 'text-gray-500'}`}>{t.dashed}</button>
+                    </div>
+                </div>
+            </div>
+            <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 flex flex-col justify-center gap-2">
+                <div style={{ height: config.thickness, backgroundColor: config.color, width: '100%', borderBottom: config.style === 'dashed' ? `${config.thickness}px dashed ${config.color}` : 'none', background: config.style === 'dashed' ? 'transparent' : config.color }}></div>
+                <span className="text-[9px] text-gray-400 text-center uppercase tracking-widest">Line Preview</span>
+            </div>
+        </div>
+    )
+}
+
 export const DocumentSettingsModal = ({ show, onClose, t, data, setData, currentLang, type }: any) => {
     const isRTL = currentLang === 'ar' || currentLang === 'ku';
     const fontClass = isRTL ? 'font-cairo' : 'font-sans';
@@ -51,37 +87,38 @@ export const DocumentSettingsModal = ({ show, onClose, t, data, setData, current
         if (show && data && data.settings) {
             const saved = type === 'consent' ? data.settings.consentSettings : data.settings.instructionSettings;
             if (saved) setSettings(saved);
+            // Reset to menu only when the modal is first opened or type changes
             setCurrentView('menu'); 
             setIsManagingTemplate(false); 
             setEditingTemplateId(null); 
             setShowQuickTemplates(false);
         }
-    }, [show, type]);
+    }, [show, type]); // Removed 'data' to prevent resets during editing/syncing
 
-    const handleSave = () => { setData((prev: ClinicData) => ({ ...prev, settings: { ...prev.settings, [type === 'consent' ? 'consentSettings' : 'instructionSettings']: settings } })); setCurrentView('menu'); };
+    const handleSave = () => { setData((prev: ClinicData) => ({ ...prev, lastUpdated: Date.now(), settings: { ...prev.settings, [type === 'consent' ? 'consentSettings' : 'instructionSettings']: settings } })); setCurrentView('menu'); };
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const base64String = reader.result as string;
-                setData((prev: ClinicData) => ({ ...prev, settings: { ...prev.settings, [type === 'consent' ? 'consentBackgroundImage' : 'instructionsBackgroundImage']: base64String } }));
+                setData((prev: ClinicData) => ({ ...prev, lastUpdated: Date.now(), settings: { ...prev.settings, [type === 'consent' ? 'consentBackgroundImage' : 'instructionsBackgroundImage']: base64String } }));
             };
             reader.readAsDataURL(file);
         }
     };
-    const handleRemoveBg = () => { setData((prev: ClinicData) => ({ ...prev, settings: { ...prev.settings, [type === 'consent' ? 'consentBackgroundImage' : 'instructionsBackgroundImage']: '' } })); };
+    const handleRemoveBg = () => { setData((prev: ClinicData) => ({ ...prev, lastUpdated: Date.now(), settings: { ...prev.settings, [type === 'consent' ? 'consentBackgroundImage' : 'instructionsBackgroundImage']: '' } })); };
     const handleApplyTemplate = (tmpl: DocumentTemplate) => { setSettings(prev => ({ ...prev, text: tmpl.text })); setShowQuickTemplates(false); if (currentView === 'templates') setCurrentView('edit_text'); };
     const handleSaveTemplate = () => {
         if (!tmplForm.title.trim() || !tmplForm.text.trim()) return;
         setData((prev: ClinicData) => {
             const templates = prev.documentTemplates || [];
-            if (editingTemplateId) { return { ...prev, documentTemplates: templates.map(t => t.id === editingTemplateId ? { ...t, ...tmplForm } : t) }; }
-            else { const newTmpl = { id: Date.now().toString(), ...tmplForm }; return { ...prev, documentTemplates: [newTmpl, ...templates] }; }
+            if (editingTemplateId) { return { ...prev, lastUpdated: Date.now(), documentTemplates: templates.map(t => t.id === editingTemplateId ? { ...t, ...tmplForm } : t) }; }
+            else { const newTmpl = { id: Date.now().toString(), ...tmplForm }; return { ...prev, lastUpdated: Date.now(), documentTemplates: [newTmpl, ...templates] }; }
         });
         setIsManagingTemplate(false); setEditingTemplateId(null); setTmplForm({ title: '', text: '' });
     };
-    const handleDeleteTemplate = (id: string) => { setData((prev: ClinicData) => ({ ...prev, documentTemplates: (prev.documentTemplates || []).filter(t => t.id !== id) })); };
+    const handleDeleteTemplate = (id: string) => { setData((prev: ClinicData) => ({ ...prev, lastUpdated: Date.now(), documentTemplates: (prev.documentTemplates || []).filter(t => t.id !== id) })); };
     if (!show) return null;
     const currentBg = type === 'consent' ? data.settings.consentBackgroundImage : data.settings.instructionsBackgroundImage;
     const MenuCard = ({ title, icon: Icon, onClick, colorClass }: any) => (
@@ -97,8 +134,8 @@ export const DocumentSettingsModal = ({ show, onClose, t, data, setData, current
                 <div className="flex justify-between items-center p-6 md:p-8 pb-4 shrink-0">
                     <div className="flex items-center gap-3">
                         {currentView !== 'menu' && ( <button onClick={() => setCurrentView('menu')} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"> <ArrowLeft size={24} className="text-gray-600 dark:text-gray-300 rtl:rotate-180" /> </button> )}
-                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                            {currentView === 'menu' ? ( <><Settings className="text-primary-600" />{type === 'consent' ? t.consentForm : t.patientInstructions} - {t.settings}</> ) : currentView === 'edit_text' ? t.editText : currentView === 'upload_bg' ? t.uploadBg : currentView === 'spacing' ? t.headerSpacing : t.loadTemplate }
+                        <h3 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
+                            {currentView === 'menu' ? ( <><Settings className="text-primary-600" />{type === 'consent' ? t.consentForm : t.patientInstructions} - {t.settings}</> ) : currentView === 'edit_text' ? t.editText : currentView === 'upload_bg' ? t.uploadBg : currentView === 'spacing' ? t.headerSpacing : currentView === 'templates' ? t.loadTemplate : '' }
                         </h3>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"><X size={24} className="text-gray-500" /></button>
@@ -132,7 +169,7 @@ export const DocumentSettingsModal = ({ show, onClose, t, data, setData, current
                     )}
                     {currentView === 'upload_bg' && (
                         <div className="flex flex-col h-full space-y-6">
-                            {currentBg ? ( <div className="bg-white dark:bg-gray-700 p-6 rounded-[2.5rem] border border-gray-200 dark:border-gray-600 shadow-sm relative group animate-fade-in"> <div className="flex justify-between items-center mb-4"> <h4 className="font-bold text-gray-700 dark:text-white flex items-center gap-2"> <Eye size={18} className="text-primary-500" /> {isRTL ? "الخلفية الحالية" : "Current Background"} </h4> <button onClick={handleRemoveBg} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition shadow-sm" title={t.removeBg}> <Trash2 size={16} /> </button> </div> <div className="aspect-[3/4] max-h-64 mx-auto overflow-hidden rounded-xl border border-gray-100 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"> <img src={currentBg} alt="Background Preview" className="w-full h-full object-contain" /> </div> </div> ) : ( <div className="p-8 bg-gray-50 dark:bg-gray-900/50 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-gray-700 text-center opacity-60"> <Image size={40} className="mx-auto mb-2 text-gray-400" /> <p className="text-sm font-bold">{isRTL ? "لا توجد خلفية حالياً" : "No background set"}</p> </div> )}
+                            {currentBg ? ( <div className="bg-white dark:bg-gray-700 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-600 shadow-sm relative group animate-fade-in"> <div className="flex justify-between items-center mb-4"> <h4 className="font-bold text-gray-700 dark:text-white flex items-center gap-2"> <Eye size={18} className="text-primary-500" /> {isRTL ? "الخلفية الحالية" : "Current Background"} </h4> <button onClick={handleRemoveBg} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition shadow-sm" title={t.removeBg}> <Trash2 size={16} /> </button> </div> <div className="aspect-[3/4] max-h-64 mx-auto overflow-hidden rounded-xl border border-gray-100 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"> <img src={currentBg} alt="Background Preview" className="w-full h-full object-contain" /> </div> </div> ) : ( <div className="p-8 bg-gray-50 dark:bg-gray-900/50 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-gray-700 text-center opacity-60"> <Image size={40} className="mx-auto mb-2 text-gray-400" /> <p className="text-sm font-bold">{isRTL ? "لا توجد خلفية حالياً" : "No background set"}</p> </div> )}
                             <div className="p-8 bg-white dark:bg-gray-700 rounded-[2.5rem] border-2 border-dashed border-purple-200 dark:border-purple-800 text-center"> <div className="w-16 h-16 bg-purple-50 dark:bg-purple-900/30 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner"> <Upload size={32} /> </div> <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{t.uploadBg}</h4> <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">{type === 'consent' ? 'A4 Size (Recommended)' : 'A5 Size (Recommended)'}</p> <label className="inline-flex cursor-pointer bg-purple-600 hover:bg-purple-700 text-white px-10 py-4 rounded-2xl font-black transition shadow-xl shadow-purple-500/30 transform hover:-translate-y-1"> {t.upload} <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} /> </label> </div>
                         </div>
                     )}
@@ -148,7 +185,7 @@ export const DocumentSettingsModal = ({ show, onClose, t, data, setData, current
                     )}
                     {currentView === 'templates' && (
                         <div className="space-y-6 animate-fade-in">
-                            {!isManagingTemplate ? ( <><button onClick={() => { setIsManagingTemplate(true); setEditingTemplateId(null); setTmplForm({ title: '', text: '' }); }} className="w-full py-4 bg-green-600 text-white rounded-2xl font-black shadow-xl shadow-green-500/30 hover:bg-green-700 transition flex items-center justify-center gap-2 transform hover:-translate-y-1"> <PlusCircle size={20} /> {t.addTemplate} </button> {(data.documentTemplates || []).length === 0 ? ( <div className="text-center py-20 text-gray-400 border-2 border-dashed rounded-3xl"> <ClipboardList size={48} className="mx-auto mb-4 opacity-20" /> <p>{isRTL ? "لا توجد قوالب محفوظة حالياً" : "No templates saved yet."}</p> </div> ) : ( <div className="grid grid-cols-1 gap-4"> {data.documentTemplates.map((tmpl: any) => ( <div key={tmpl.id} className="p-5 bg-white dark:bg-gray-700 rounded-2xl border border-gray-100 dark:border-gray-600 hover:border-primary-200 transition group flex items-center justify-between shadow-sm"> <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => handleApplyTemplate(tmpl)}> <div className="w-12 h-12 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-xl flex items-center justify-center shadow-inner"><FileText size={24}/></div> <div> <span className="font-black text-gray-800 dark:text-white text-lg block">{tmpl.title}</span> <span className="text-xs text-gray-400 truncate max-w-[200px] block">{tmpl.text.slice(0, 50)}...</span> </div> </div> <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"> <button onClick={() => { setEditingTemplateId(tmpl.id); setTmplForm({ title: tmpl.title, text: tmpl.text }); setIsManagingTemplate(true); }} className="p-3 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl border border-transparent hover:border-blue-100 transition"> <Edit2 size={18}/> </button> <button onClick={() => handleDeleteTemplate(tmpl.id)} className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl border border-transparent hover:border-red-100 transition"> <Trash2 size={18}/> </button> </div> </div> ))} </div> )}</> ) : ( <div className="space-y-5 animate-fade-in bg-white dark:bg-gray-700 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-600 shadow-xl"> <div className="flex justify-between items-center mb-2"> <h4 className="font-black text-gray-800 dark:text-white uppercase tracking-tight">{editingTemplateId ? t.editTemplate : t.addTemplate}</h4> <button onClick={() => setIsManagingTemplate(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition"><X size={20}/></button> </div> <div className="space-y-4"> <div> <label className="block text-xs font-black text-gray-400 uppercase mb-1 ms-1">{t.templateName}</label> <input value={tmplForm.title} onChange={e => setTmplForm({...tmplForm, title: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 font-bold border-none shadow-inner" placeholder={t.templateName} /> </div> <div> <label className="block text-xs font-black text-gray-400 uppercase mb-1 ms-1">{t.documentText}</label> <textarea value={tmplForm.text} onChange={e => setTmplForm({...tmplForm, text: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 font-medium min-h-[200px] border-none shadow-inner" placeholder={t.writeTextHere} /> </div> </div> <div className="flex gap-3"> <button onClick={() => setIsManagingTemplate(false)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 font-black rounded-2xl hover:bg-gray-200 transition">{t.cancel}</button> <button onClick={handleSaveTemplate} className="flex-1 py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition">{t.save}</button> </div> </div> )}
+                            {!isManagingTemplate ? ( <><button onClick={() => { setIsManagingTemplate(true); setEditingTemplateId(null); setTmplForm({ title: '', text: '' }); }} className="w-full py-4 bg-green-600 text-white rounded-2xl font-black shadow-xl shadow-green-500/30 hover:bg-green-700 transition flex items-center justify-center gap-2 transform hover:-translate-y-1"> <PlusCircle size={20} /> {t.addTemplate} </button> {(data.documentTemplates || []).length === 0 ? ( <div className="text-center py-20 text-gray-400 border-2 border-dashed rounded-3xl"> <ClipboardList size={48} className="mx-auto mb-4 opacity-20" /> <p>{isRTL ? "لا توجد قوالب محفوظة حالياً" : "No templates saved yet."}</p> </div> ) : ( <div className="grid grid-cols-1 gap-4"> {data.documentTemplates.map((tmpl: any) => ( <div key={tmpl.id} className="p-5 bg-white dark:bg-gray-700 rounded-2xl border border-gray-100 dark:border-gray-600 hover:border-primary-200 transition group flex items-center justify-between shadow-sm"> <div className="flex items-center gap-4 flex-1 cursor-pointer" onClick={() => handleApplyTemplate(tmpl)}> <div className="w-12 h-12 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-xl flex items-center justify-center shadow-inner"><FileText size={24}/></div> <div> <span className="font-black text-gray-800 dark:text-white text-lg block">{tmpl.title}</span> <span className="text-xs text-gray-400 truncate max-w-[200px] block">{tmpl.text.slice(0, 50)}...</span> </div> </div> <div className="flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"> <button onClick={() => { setEditingTemplateId(tmpl.id); setTmplForm({ title: tmpl.title, text: tmpl.text }); setIsManagingTemplate(true); }} className="p-3 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl border border-transparent hover:border-blue-100 transition"> <Edit2 size={18}/> </button> <button onClick={() => handleDeleteTemplate(tmpl.id)} className="p-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl border border-transparent hover:border-red-100 transition"> <Trash2 size={18}/> </button> </div> </div> ))} </div> )}</> ) : ( <div className="space-y-5 animate-fade-in bg-white dark:bg-gray-700 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-xl"> <div className="flex justify-between items-center mb-2"> <h4 className="font-black text-gray-800 dark:text-white uppercase tracking-tight">{editingTemplateId ? t.editTemplate : t.addTemplate}</h4> <button onClick={() => setIsManagingTemplate(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition"><X size={20}/></button> </div> <div className="space-y-4"> <div> <label className="block text-xs font-black text-gray-400 uppercase mb-1 ms-1">{t.templateName}</label> <input value={tmplForm.title} onChange={e => setTmplForm({...tmplForm, title: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 font-bold border-none shadow-inner" placeholder={t.templateName} /> </div> <div> <label className="block text-xs font-black text-gray-400 uppercase mb-1 ms-1">{t.documentText}</label> <textarea value={tmplForm.text} onChange={e => setTmplForm({...tmplForm, text: e.target.value})} className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-primary-500 font-medium min-h-[200px] border-none shadow-inner" placeholder={t.writeTextHere} /> </div> </div> <div className="flex gap-3"> <button onClick={() => setIsManagingTemplate(false)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 font-black rounded-2xl hover:bg-gray-200 transition">{t.cancel}</button> <button onClick={handleSaveTemplate} className="flex-1 py-4 bg-primary-600 text-white font-black rounded-2xl shadow-xl shadow-primary-500/20 hover:bg-primary-700 transition">{t.save}</button> </div> </div> )}
                         </div>
                     )}
                 </div>
@@ -157,51 +194,81 @@ export const DocumentSettingsModal = ({ show, onClose, t, data, setData, current
     );
 };
 
-export const RxSettingsModal = ({ show, onClose, t, data, setData, handleRxFileUpload, setShowAddMasterDrugModal, currentLang }: any) => {
+export const RxSettingsModal = ({ show, onClose, t, data, setData, handleRxFileUpload, handleRemoveRxBg, setShowAddMasterDrugModal, currentLang }: any) => {
     const isRTL = currentLang === 'ar' || currentLang === 'ku';
     const fontClass = isRTL ? 'font-cairo' : 'font-sans';
-    type RxSettingsView = 'menu' | 'manage_meds' | 'upload_bg' | 'style_meds' | 'style_rx' | 'spacing' | 'paper_size';
+    type RxSettingsView = 'menu' | 'manage_meds' | 'upload_bg' | 'style_meds' | 'style_rx' | 'style_header_info' | 'style_header_line' | 'spacing' | 'paper_size';
     const [currentView, setCurrentView] = useState<RxSettingsView>('menu');
+    
     const defaultRxSymbol = { fontSize: 30, color: '#000000', isBold: true, isItalic: true };
     const defaultMeds = { fontSize: 14, color: '#000000', isBold: true, isItalic: false };
+    const defaultHeaderInfo = { fontSize: 12, color: '#000000', isBold: true, isItalic: false };
+    const defaultHeaderLine = { color: '#000000', thickness: 1, style: 'solid' as 'solid' | 'dashed' };
+
     const [rxSymbolConfig, setRxSymbolConfig] = useState<TextStyleConfig>(defaultRxSymbol);
     const [medsConfig, setMedsConfig] = useState<TextStyleConfig>(defaultMeds);
+    const [headerInfoConfig, setHeaderInfoConfig] = useState<TextStyleConfig>(defaultHeaderInfo);
+    const [headerLineConfig, setHeaderLineConfig] = useState<LineStyleConfig>(defaultHeaderLine);
     const [topMargin, setTopMargin] = useState<number>(100);
     const [paperSize, setPaperSize] = useState<'A4' | 'A5'>('A5');
 
     useEffect(() => {
         if (show && data && data.settings) {
-            const settings = data.settings;
-            setRxSymbolConfig(settings.rxTemplate?.rxSymbol || defaultRxSymbol);
-            setMedsConfig(settings.rxTemplate?.medications || defaultMeds);
-            setTopMargin(settings.rxTemplate?.topMargin ?? 100);
-            setPaperSize(settings.rxTemplate?.paperSize || 'A5');
-            setCurrentView('menu');
+            const s = data.settings.rxTemplate;
+            setRxSymbolConfig(s?.rxSymbol || defaultRxSymbol);
+            setMedsConfig(s?.medications || defaultMeds);
+            setHeaderInfoConfig(s?.headerInfo || defaultHeaderInfo);
+            setHeaderLineConfig(s?.headerLine || defaultHeaderLine);
+            setTopMargin(s?.topMargin ?? 100);
+            setPaperSize(s?.paperSize || 'A5');
+            // Only set to menu when the modal is initially opened
+            if (currentView === 'menu') {
+                setCurrentView('menu');
+            }
         }
-    }, [show]);
+    }, [show]); // Removed 'data' to prevent resets during editing/syncing
 
-    const handleSaveStyle = () => { setData((prev: ClinicData) => ({ ...prev, lastUpdated: Date.now(), settings: { ...prev.settings, rxTemplate: { rxSymbol: rxSymbolConfig, medications: medsConfig, topMargin: topMargin, paperSize: paperSize } } })); setCurrentView('menu'); };
-    const handleRemoveBg = () => { setData((prev: ClinicData) => ({ ...prev, settings: { ...prev.settings, rxBackgroundImage: '' } })); };
+    const handleSaveStyle = () => { 
+        setData((prev: ClinicData) => ({ 
+            ...prev, 
+            lastUpdated: Date.now(), 
+            settings: { 
+                ...prev.settings, 
+                rxTemplate: { 
+                    rxSymbol: rxSymbolConfig, 
+                    medications: medsConfig, 
+                    headerInfo: headerInfoConfig,
+                    headerLine: headerLineConfig,
+                    topMargin: topMargin, 
+                    paperSize: paperSize 
+                } 
+            } 
+        })); 
+        if (currentView !== 'menu') setCurrentView('menu');
+    };
+    
     if (!show) return null;
     const currentBg = data.settings.rxBackgroundImage;
     const MenuCard = ({ title, icon: Icon, onClick, colorClass }: any) => (
-        <button onClick={onClick} className={`flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-gray-700/50 shadow-sm group ${colorClass}`}> <div className="w-16 h-16 rounded-full bg-gray-50 dark:bg-gray-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"> <Icon size={32} className="opacity-80" /> </div> <span className="font-bold text-gray-800 dark:text-white text-center">{title}</span> </button>
+        <button onClick={onClick} className={`flex flex-col items-center justify-center p-6 rounded-3xl border-2 border-transparent transition-all duration-300 hover:shadow-xl hover:-translate-y-1 bg-white dark:bg-gray-700/50 shadow-sm group ${colorClass}`}> <div className="w-14 h-14 rounded-full bg-gray-50 dark:bg-gray-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"> <Icon size={28} className="opacity-80" /> </div> <span className="font-bold text-gray-800 dark:text-white text-center text-xs leading-tight">{title}</span> </button>
     );
 
     return createPortal(
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
             <div className={`bg-gray-50 dark:bg-gray-800 w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden ${fontClass}`} dir={isRTL ? 'rtl' : 'ltr'}>
                 <div className="flex justify-between items-center p-6 md:p-8 pb-4 shrink-0">
-                    <div className="flex items-center gap-3"> {currentView !== 'menu' && ( <button onClick={() => setCurrentView('menu')} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"> <ArrowLeft size={24} className="text-gray-600 dark:text-gray-300 rtl:rotate-180" /> </button> )} <h3 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2"> {currentView === 'menu' ? ( <><Settings className="text-primary-600" />{t.rxSettings}</> ) : currentView === 'manage_meds' ? t.manageMedications : currentView === 'upload_bg' ? t.uploadRxBg : currentView === 'style_meds' ? t.medsTextStyle : currentView === 'spacing' ? t.headerSpacing : currentView === 'paper_size' ? (isRTL ? 'حجم الورق' : 'Paper Size') : t.rxSymbolStyle } </h3> </div>
+                    <div className="flex items-center gap-3"> {currentView !== 'menu' && ( <button onClick={() => setCurrentView('menu')} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"> <ArrowLeft size={24} className="text-gray-600 dark:text-gray-300 rtl:rotate-180" /> </button> )} <h3 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2"> {currentView === 'menu' ? ( <><Settings className="text-primary-600" />{t.rxSettings}</> ) : currentView === 'manage_meds' ? t.manageMedications : currentView === 'upload_bg' ? t.uploadRxBg : currentView === 'style_meds' ? t.medsTextStyle : currentView === 'style_header_info' ? t.headerInfoStyle : currentView === 'style_header_line' ? t.headerLineStyle : currentView === 'spacing' ? t.headerSpacing : currentView === 'paper_size' ? (isRTL ? 'حجم الورق' : 'Paper Size') : t.rxSymbolStyle } </h3> </div>
                     <button onClick={onClose} className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition"><X size={24} className="text-gray-500" /></button>
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 pt-2">
                     {currentView === 'menu' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-full content-center">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 h-full content-center">
                             <MenuCard title={t.manageMedications} icon={Pill} onClick={() => { setShowAddMasterDrugModal(true); onClose(); }} colorClass="hover:border-purple-200 text-purple-600" />
                             <MenuCard title={t.uploadRxBg} icon={Image} onClick={() => setCurrentView('upload_bg')} colorClass="hover:border-blue-200 text-blue-600" />
                             <MenuCard title={isRTL ? 'حجم الورق' : 'Paper Size'} icon={FileStack} onClick={() => setCurrentView('paper_size')} colorClass="hover:border-rose-200 text-rose-600" />
                             <MenuCard title={t.headerSpacing} icon={Layout} onClick={() => setCurrentView('spacing')} colorClass="hover:border-indigo-200 text-indigo-600" />
+                            <MenuCard title={t.headerInfoStyle} icon={Hash} onClick={() => setCurrentView('style_header_info')} colorClass="hover:border-amber-200 text-amber-600" />
+                            <MenuCard title={t.headerLineStyle} icon={Minus} onClick={() => setCurrentView('style_header_line')} colorClass="hover:border-gray-200 text-gray-500" />
                             <MenuCard title={t.medsTextStyle} icon={AlignLeft} onClick={() => setCurrentView('style_meds')} colorClass="hover:border-green-200 text-green-600" />
                             <MenuCard title={t.rxSymbolStyle} icon={Italic} onClick={() => setCurrentView('style_rx')} colorClass="hover:border-orange-200 text-orange-600" />
                         </div>
@@ -228,19 +295,13 @@ export const RxSettingsModal = ({ show, onClose, t, data, setData, handleRxFileU
                                         <span className="text-[10px] opacity-60 mt-1 uppercase font-bold tracking-tighter">Standard Format</span>
                                     </button>
                                 </div>
-                                <div className="mt-8 p-4 bg-primary-50 dark:bg-primary-900/10 rounded-2xl border border-primary-100 dark:border-primary-800/30 flex items-start gap-3">
-                                    <HelpCircle size={20} className="text-primary-600 shrink-0 mt-0.5" />
-                                    <p className="text-xs text-primary-700 dark:text-primary-300 leading-relaxed font-bold">
-                                        {isRTL ? "سيتم تطبيق هذا الحجم عند توليد ملف الـ PDF للوصفة الطبية لضمان أفضل توافق مع ورق الطابعة الخاص بك." : "This size will be applied when generating Rx PDFs to ensure best compatibility with your printer paper."}
-                                    </p>
-                                </div>
                             </div>
                             <button onClick={handleSaveStyle} className="w-full bg-primary-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-primary-700 transition transform hover:-translate-y-1"> {t.save} </button>
                         </div>
                     )}
                     {currentView === 'upload_bg' && (
                         <div className="flex flex-col h-full space-y-6">
-                            {currentBg ? ( <div className="bg-white dark:bg-gray-700 p-6 rounded-[2.5rem] border border-gray-200 dark:border-gray-600 shadow-sm relative animate-fade-in"> <div className="flex justify-between items-center mb-4"> <h4 className="font-bold text-gray-700 dark:text-white flex items-center gap-2"> <Eye size={18} className="text-primary-500" /> {isRTL ? "خلفية الوصفة الحالية" : "Current Rx Background"} </h4> <button onClick={handleRemoveBg} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition shadow-sm" title={t.removeBg}> <Trash2 size={16} /> </button> </div> <div className="aspect-[1/1.4] max-h-64 mx-auto overflow-hidden rounded-xl border border-gray-100 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 shadow-inner"> <img src={currentBg} alt="Background Preview" className="w-full h-full object-contain" /> </div> </div> ) : ( <div className="p-8 bg-gray-50 dark:bg-gray-900/50 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-gray-700 text-center opacity-60"> <Image size={40} className="mx-auto mb-2 text-gray-400" /> <p className="text-sm font-bold">{isRTL ? "لا توجد خلفية للوصفة" : "No Rx background set"}</p> </div> )}
+                            {currentBg ? ( <div className="bg-white dark:bg-gray-700 p-6 rounded-[2.5rem] border border-gray-100 dark:border-gray-600 shadow-sm relative animate-fade-in"> <div className="flex justify-between items-center mb-4"> <h4 className="font-bold text-gray-700 dark:text-white flex items-center gap-2"> <Eye size={18} className="text-primary-500" /> {isRTL ? "خلفية الوصفة الحالية" : "Current Rx Background"} </h4> <button onClick={() => { handleRemoveRxBg?.(); }} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-500 hover:text-white transition shadow-sm" title={t.removeBg}> <Trash2 size={16} /> </button> </div> <div className="aspect-[1/1.4] max-h-64 mx-auto overflow-hidden rounded-xl border border-gray-100 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 shadow-inner"> <img src={currentBg} alt="Background Preview" className="w-full h-full object-contain" /> </div> </div> ) : ( <div className="p-8 bg-gray-50 dark:bg-gray-900/50 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-gray-700 text-center opacity-60"> <Image size={40} className="mx-auto mb-2 text-gray-400" /> <p className="text-sm font-bold">{isRTL ? "لا توجد خلفية للوصفة" : "No Rx background set"}</p> </div> )}
                             <div className="p-8 bg-white dark:bg-gray-700 rounded-3xl border-2 border-dashed border-blue-200 dark:border-blue-800 text-center"> <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner"> <Upload size={32} /> </div> <h4 className="text-xl font-bold text-gray-800 dark:text-white mb-2">{t.uploadRxBg}</h4> <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">{t.recSize}</p> <label className="inline-flex cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl font-bold transition shadow-lg shadow-blue-500/30 transform hover:-translate-y-1"> {t.upload} <input type="file" accept="image/*" className="hidden" onChange={(e) => { handleRxFileUpload(e); }} /> </label> </div>
                         </div>
                     )}
@@ -249,14 +310,26 @@ export const RxSettingsModal = ({ show, onClose, t, data, setData, handleRxFileU
                             <div className="bg-white dark:bg-gray-700 p-6 rounded-3xl border border-gray-200 dark:border-gray-600 shadow-sm">
                                 <div className="flex justify-between items-center mb-6"> <h4 className="font-bold text-gray-800 dark:text-white">{t.topMargin}</h4> <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full font-mono font-bold">{topMargin} pt</span> </div>
                                 <input type="range" min="50" max="300" step="5" value={topMargin} onChange={(e) => setTopMargin(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-600 mb-8" />
-                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-500 rounded-xl p-4 relative min-h-[250px] bg-gray-50 dark:bg-gray-800 overflow-hidden"> <div className="bg-indigo-100 dark:bg-indigo-900/40 border-b-2 border-indigo-300 dark:border-indigo-700 flex items-center justify-center transition-all duration-300" style={{ height: `${topMargin / 2}px` }}> <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{t.headerSpacing}</span> </div> <div className="p-4 space-y-3 opacity-30"> <div className="h-4 w-3/4 bg-gray-300 dark:bg-gray-600 rounded"></div> <div className="h-8 w-1/4 bg-indigo-300 dark:bg-indigo-700 rounded"></div> </div> </div>
+                                <div className="border-2 border-dashed border-gray-300 dark:border-gray-500 rounded-xl p-4 relative min-h-[250px] bg-gray-50 dark:bg-gray-800 overflow-hidden"> <div className="bg-indigo-100 dark:bg-indigo-900/40 border-b-2 border-indigo-300 dark:border-indigo-700 flex items-center justify-center transition-all duration-300" style={{ height: `${topMargin / 2}px` }}> <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest">{t.headerSpacing}</span> </div> </div>
                             </div>
                             <button onClick={handleSaveStyle} className="w-full bg-primary-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-primary-700 transition transform hover:-translate-y-1"> {t.save} </button>
                         </div>
                     )}
                     {currentView === 'style_meds' && (
                         <div className="space-y-6">
-                            <StyleEditor config={medsConfig} onChange={setMedsConfig} label={t.medicationSaved} t={t} />
+                            <StyleEditor config={medsConfig} onChange={setMedsConfig} label={t.medsTextStyle} t={t} />
+                            <button onClick={handleSaveStyle} className="w-full bg-primary-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-primary-700 transition transform hover:-translate-y-1"> {t.save} </button>
+                        </div>
+                    )}
+                    {currentView === 'style_header_info' && (
+                        <div className="space-y-6">
+                            <StyleEditor config={headerInfoConfig} onChange={setHeaderInfoConfig} label={t.headerInfoStyle} t={t} />
+                            <button onClick={handleSaveStyle} className="w-full bg-primary-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-primary-700 transition transform hover:-translate-y-1"> {t.save} </button>
+                        </div>
+                    )}
+                    {currentView === 'style_header_line' && (
+                        <div className="space-y-6">
+                            <LineStyleEditor config={headerLineConfig} onChange={setHeaderLineConfig} label={t.headerLineStyle} t={t} />
                             <button onClick={handleSaveStyle} className="w-full bg-primary-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-primary-700 transition transform hover:-translate-y-1"> {t.save} </button>
                         </div>
                     )}
@@ -334,58 +407,6 @@ export const PatientQueriesModal = ({ show, onClose, t, currentLang, initialData
                     })}
                 </div>
                 <div className="mt-8 pt-6 border-t border-gray-100 dark:border-gray-800 shrink-0"> <button onClick={handleSave} className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/20 hover:bg-blue-700 hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300"> {t.save} </button> </div>
-            </div>
-        </div>, document.body
-    );
-};
-
-export const DocumentModal = ({ show, onClose, t, type, onPrint, data, onSaveTemplate }: any) => {
-    const [alignment, setAlignment] = useState<'left' | 'center' | 'right'>('center');
-    const [fontSize, setFontSize] = useState<number>(18);
-    const [text, setText] = useState('');
-    const [showSaveTemplate, setShowSaveTemplate] = useState(false);
-    const [templateTitle, setTemplateTitle] = useState('');
-    if (!show) return null;
-    const handleSaveNewTemplate = () => {
-        if (!templateTitle.trim() || !text.trim()) return;
-        const newTemplate: DocumentTemplate = { id: Date.now().toString(), title: templateTitle, text: text };
-        onSaveTemplate(newTemplate); setTemplateTitle(''); setShowSaveTemplate(false);
-    };
-    const handleLoadTemplate = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const tmpl = data?.documentTemplates?.find((t: DocumentTemplate) => t.id === e.target.value);
-        if (tmpl) { setText(tmpl.text); }
-    };
-
-    return createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-3xl shadow-2xl p-6 h-[90vh] flex flex-col">
-                <div className="flex justify-between items-center mb-4 shrink-0"> <h3 className="text-xl font-bold text-gray-800 dark:text-white"> {type === 'consent' ? t.consentForm : t.patientInstructions} </h3> <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full"><X size={20} className="text-gray-500" /></button> </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
-                    <div className="flex flex-wrap items-center gap-2 bg-gray-50 dark:bg-gray-700 p-2 rounded-xl">
-                        <button onClick={() => setAlignment('left')} className={`p-2 rounded-lg ${alignment === 'left' ? 'bg-white dark:bg-gray-600 shadow' : 'text-gray-500'}`} title={t.alignLeft}><AlignLeft size={18}/></button>
-                        <button onClick={() => setAlignment('center')} className={`p-2 rounded-lg ${alignment === 'center' ? 'bg-white dark:bg-gray-600 shadow' : 'text-gray-500'}`} title={t.alignCenter}><AlignCenter size={18}/></button>
-                        <button onClick={() => setAlignment('right')} className={`p-2 rounded-lg ${alignment === 'right' ? 'bg-white dark:bg-gray-600 shadow' : 'text-gray-500'}`} title={t.alignRight}><AlignRight size={18}/></button>
-                        <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1"></div>
-                        <div className="flex items-center gap-2"> <span className="text-xs font-bold text-gray-500">{t.fontSize}</span> <input type="number" value={fontSize} onChange={(e) => setFontSize(parseInt(e.target.value))} className="w-14 p-1 rounded-lg border text-center dark:bg-gray-800 dark:text-white outline-none" min={10} max={40} /> </div>
-                    </div>
-                    <div className="flex flex-col gap-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl">
-                        <div className="flex gap-2">
-                            <select onChange={handleLoadTemplate} className="flex-1 p-2 rounded-lg border border-blue-100 dark:border-blue-800 dark:bg-gray-800 dark:text-white text-sm outline-none">
-                                <option value="">{t.selectTemplate}</option>
-                                {data?.documentTemplates?.map((tmpl: DocumentTemplate) => ( <option key={tmpl.id} value={tmpl.id}>{tmpl.title}</option> ))}
-                            </select>
-                            <button onClick={() => setShowSaveTemplate(!showSaveTemplate)} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition" title={t.saveTemplate}> <Save size={18} /> </button>
-                        </div>
-                        {showSaveTemplate && (
-                            <div className="flex gap-2 mt-2 animate-fade-in">
-                                <input value={templateTitle} onChange={(e) => setTemplateTitle(e.target.value)} placeholder={t.templateName} className="flex-1 p-2 rounded-lg border dark:bg-gray-800 dark:text-white outline-none text-sm" />
-                                <button onClick={handleSaveNewTemplate} className="bg-green-600 text-white px-3 py-1 rounded-lg text-sm font-bold">{t.save}</button>
-                            </div>
-                        )}
-                    </div>
-                    <div> <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">{t.documentText}</label> <textarea value={text} onChange={(e) => setText(e.target.value)} style={{ textAlign: alignment, fontSize: `${fontSize}px` }} className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-700 dark:text-white outline-none min-h-[300px]" placeholder={t.writeTextHere} /> </div>
-                </div>
-                <div className="mt-4 pt-2 border-t border-gray-100 dark:border-gray-700"> <button onClick={() => onPrint({ text, align: alignment, fontSize })} className="w-full py-3 bg-primary-600 text-white font-bold rounded-xl shadow-lg hover:bg-primary-700 flex items-center justify-center gap-2"> <Printer size={20} /> {t.print} </button> </div>
             </div>
         </div>, document.body
     );

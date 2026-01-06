@@ -84,8 +84,8 @@ const drawText = (
     return totalWidth;
 };
 
-const drawLine = (page: PDFPage, startX: number, endX: number, y: number, thickness = 1, color = COLORS.line) => {
-    page.drawLine({ start: { x: startX, y }, end: { x: endX, y }, thickness, color });
+const drawLine = (page: PDFPage, startX: number, endX: number, y: number, thickness = 1, color = COLORS.line, isDashed = false) => {
+    page.drawLine({ start: { x: startX, y }, end: { x: endX, y }, thickness, color, dashArray: isDashed ? [thickness * 2, thickness * 2] : undefined });
 };
 
 const drawDashedLine = (page: PDFPage, startX: number, endX: number, y: number) => {
@@ -100,20 +100,29 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
     pdfDoc.registerFontkit(fontkit);
     const fontRegular = await pdfDoc.embedFont(fontBytes);
     const fontBold = await pdfDoc.embedFont(fontBoldBytes);
-    const rxConfig = data.settings.rxTemplate?.rxSymbol || { fontSize: 30, color: '#000000', isBold: true, isItalic: true };
-    const medsConfig = data.settings.rxTemplate?.medications || { fontSize: 14, color: '#000000', isBold: true, isItalic: false };
-    const customTopMargin = data.settings.rxTemplate?.topMargin ?? 100;
-    const paperSizeChoice = data.settings.rxTemplate?.paperSize || 'A5';
+    
+    const s = data.settings.rxTemplate;
+    const rxConfig = s?.rxSymbol || { fontSize: 30, color: '#000000', isBold: true, isItalic: true };
+    const medsConfig = s?.medications || { fontSize: 14, color: '#000000', isBold: true, isItalic: false };
+    const headerInfoConfig = s?.headerInfo || { fontSize: 12, color: '#000000', isBold: true, isItalic: false };
+    const headerLineConfig = s?.headerLine || { color: '#000000', thickness: 1, style: 'solid' };
+    
+    const customTopMargin = s?.topMargin ?? 100;
+    const paperSizeChoice = s?.paperSize || 'A5';
+    
     const pageDimensions: [number, number] = paperSizeChoice === 'A4' ? [595, 842] : [420, 595];
     const page = pdfDoc.addPage(pageDimensions);
     const { width, height } = page.getSize();
     const margin = 25;
+    const labelPadding = 8;
     const isRTL = currentLang === 'ar' || currentLang === 'ku';
+
     let bgImageBase64 = data.settings.rxBackgroundImage;
     if (patient.doctorId) {
         const doc = data.doctors.find(d => d.id === patient.doctorId);
         if (doc && doc.rxBackgroundImage) bgImageBase64 = doc.rxBackgroundImage;
     }
+
     if (bgImageBase64) {
         try {
             let imageBytes; let imageType;
@@ -124,35 +133,57 @@ export const generateRxPdf = async (data: ClinicData, patient: Patient, rx: Pres
             page.drawImage(bgImage, { x: 0, y: 0, width, height });
         } catch (e) { console.error("Failed to load background image", e); }
     }
-    let y = height - 40;
-    if (!bgImageBase64) {
-        drawText(page, data.clinicName, width / 2, y, fontBold, 18, 'center', COLORS.accent);
-        y -= 15;
-        const docName = data.doctors.find(d => d.id === patient.doctorId)?.name || '';
-        if(docName) drawText(page, `Dr. ${docName}`, width / 2, y, fontRegular, 11, 'center', COLORS.secondary);
-        y -= 15; drawLine(page, margin, width - margin, y, 1, COLORS.line); y -= 25;
-    } else { y = height - customTopMargin; }
-    const labelColor = COLORS.accent; const valueColor = COLORS.primary;
+
+    let y = height - customTopMargin;
+    
     const tName = currentLang === 'ar' ? 'الاسم:' : (currentLang === 'ku' ? 'ناو:' : 'Name:');
     const tAge = currentLang === 'ar' ? 'العمر:' : (currentLang === 'ku' ? 'تەمەن:' : 'Age:');
     const tDate = currentLang === 'ar' ? 'التاريخ:' : (currentLang === 'ku' ? 'بەروار:' : 'Date:');
     const dateStr = new Date(rx.date).toLocaleDateString('en-GB');
+
+    const headerFont = headerInfoConfig.isBold ? fontBold : fontRegular;
+    const headerColor = hexToPdfColor(headerInfoConfig.color);
+    const headerSize = headerInfoConfig.fontSize || 12;
+
+    // حساب عرض العناوين لتجنب التداخل
+    const tNameWidth = headerFont.widthOfTextAtSize(processArabicText(tName), headerSize);
+    const tAgeWidth = headerFont.widthOfTextAtSize(processArabicText(tAge), headerSize);
+    const tDateWidth = headerFont.widthOfTextAtSize(processArabicText(tDate), headerSize);
+
     if (isRTL) {
-        drawText(page, tName, width - margin, y, fontBold, 12, 'right', labelColor);
-        drawText(page, patient.name, width - margin - 40, y, fontBold, 12, 'right', valueColor);
-        drawText(page, tAge, width - margin - (paperSizeChoice === 'A4' ? 250 : 190), y, fontBold, 12, 'right', labelColor);
-        drawText(page, `${patient.age}`, width - margin - (paperSizeChoice === 'A4' ? 300 : 230), y, fontRegular, 12, 'right', valueColor);
-        drawText(page, tDate, margin + 100, y, fontBold, 12, 'right', labelColor); 
-        drawText(page, dateStr, margin, y, fontRegular, 12, 'left', valueColor);
+        // الاسم (أقصى اليمين)
+        drawText(page, tName, width - margin, y, headerFont, headerSize, 'right', headerColor, undefined, headerInfoConfig.isItalic);
+        drawText(page, patient.name, width - margin - tNameWidth - labelPadding, y, headerFont, headerSize, 'right', headerColor, undefined, headerInfoConfig.isItalic);
+        
+        // العمر (الوسط)
+        const ageX = width - margin - (paperSizeChoice === 'A4' ? 250 : 190);
+        drawText(page, tAge, ageX, y, headerFont, headerSize, 'right', headerColor, undefined, headerInfoConfig.isItalic);
+        drawText(page, `${patient.age}`, ageX - tAgeWidth - labelPadding, y, headerFont, headerSize, 'right', headerColor, undefined, headerInfoConfig.isItalic);
+        
+        // التاريخ (أقصى اليسار)
+        // نحسب عرض التاريخ لتحديد مكان كلمة "التاريخ" بدقة
+        const dateValueWidth = headerFont.widthOfTextAtSize(dateStr, headerSize);
+        drawText(page, dateStr, margin, y, headerFont, headerSize, 'left', headerColor, undefined, headerInfoConfig.isItalic);
+        drawText(page, tDate, margin + dateValueWidth + labelPadding, y, headerFont, headerSize, 'left', headerColor, undefined, headerInfoConfig.isItalic);
     } else {
-        drawText(page, tName, margin, y, fontBold, 12, 'left', labelColor);
-        drawText(page, patient.name, margin + 50, y, fontBold, 12, 'left', valueColor);
-        drawText(page, tAge, margin + (paperSizeChoice === 'A4' ? 230 : 170), y, fontBold, 12, 'left', labelColor);
-        drawText(page, `${patient.age}`, margin + (paperSizeChoice === 'A4' ? 280 : 210), y, fontRegular, 12, 'left', valueColor);
-        drawText(page, tDate, width - margin - 100, y, fontBold, 12, 'left', labelColor);
-        drawText(page, dateStr, width - margin, y, fontRegular, 12, 'right', valueColor);
+        // Name (Left)
+        drawText(page, tName, margin, y, headerFont, headerSize, 'left', headerColor, undefined, headerInfoConfig.isItalic);
+        drawText(page, patient.name, margin + tNameWidth + labelPadding, y, headerFont, headerSize, 'left', headerColor, undefined, headerInfoConfig.isItalic);
+        
+        // Age (Middle)
+        const ageX = margin + (paperSizeChoice === 'A4' ? 230 : 170);
+        drawText(page, tAge, ageX, y, headerFont, headerSize, 'left', headerColor, undefined, headerInfoConfig.isItalic);
+        drawText(page, `${patient.age}`, ageX + tAgeWidth + labelPadding, y, headerFont, headerSize, 'left', headerColor, undefined, headerInfoConfig.isItalic);
+        
+        // Date (Right)
+        drawText(page, tDate, width - margin - 100, y, headerFont, headerSize, 'left', headerColor, undefined, headerInfoConfig.isItalic);
+        drawText(page, dateStr, width - margin, y, headerFont, headerSize, 'right', headerColor, undefined, headerInfoConfig.isItalic);
     }
-    y -= 15; drawLine(page, margin, width - margin, y, 1, COLORS.primary); y -= 45;
+
+    y -= 15; 
+    drawLine(page, margin, width - margin, y, headerLineConfig.thickness || 1, hexToPdfColor(headerLineConfig.color), headerLineConfig.style === 'dashed'); 
+    y -= 45;
+
     const rxFont = rxConfig.isBold ? fontBold : fontRegular;
     page.drawText('RX/', { x: margin, y, size: rxConfig.fontSize || 30, font: rxFont, color: hexToPdfColor(rxConfig.color), ySkew: rxConfig.isItalic ? degrees(15) : undefined });
     y -= 40;

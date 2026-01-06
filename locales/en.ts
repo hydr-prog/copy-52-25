@@ -1,3 +1,4 @@
+
 export const en = {
     privacyPolicy: "Privacy Policy",
     termsOfService: "Terms of Service",
@@ -107,6 +108,12 @@ export const en = {
     rxSettings: "Rx Settings",
     rxSymbolStyle: "Rx Symbol Style",
     medsTextStyle: "Medications Text Style",
+    headerInfoStyle: "Patient Info Style",
+    headerLineStyle: "Header Line Style",
+    lineThickness: "Line Thickness",
+    lineStyle: "Line Style",
+    solid: "Solid",
+    dashed: "Dashed",
     generalRxSettings: "General Settings",
     bold: "Bold",
     appTheme: "App Appearance",
@@ -195,6 +202,7 @@ export const en = {
     addCharge: "Add Charge",
     printPrescription: "Print Prescription",
     printInvoice: "Print Invoice",
+    examinationReceipt: "Examination Receipt",
     whatsapp: "WhatsApp",
     call: "Call",
     images: "X-Rays & Images",

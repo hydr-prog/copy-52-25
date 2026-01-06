@@ -1,6 +1,23 @@
 
 export type Language = 'en' | 'ar' | 'ku';
 
+export interface MedicationCategory {
+  id: string;
+  name: string;
+  updatedAt?: number;
+}
+
+export interface Medication {
+  id: string;
+  name: string;
+  dose: string;
+  frequency: string;
+  form: string;
+  notes?: string;
+  categoryId?: string; // ربط الدواء بمجموعة
+  updatedAt?: number;
+}
+
 export interface PatientImage {
   id: string;
   url: string;
@@ -112,16 +129,6 @@ export interface TreatmentSession {
   id: string;
   date: string;
   description: string;
-  updatedAt?: number;
-}
-
-export interface Medication {
-  id: string;
-  name: string;
-  dose: string;
-  frequency: string;
-  form: string;
-  notes?: string;
   updatedAt?: number;
 }
 
@@ -270,6 +277,12 @@ export interface TextStyleConfig {
   isItalic: boolean;
 }
 
+export interface LineStyleConfig {
+  color: string;
+  thickness: number;
+  style: 'solid' | 'dashed';
+}
+
 export interface DocumentSettings {
     text: string;
     fontSize: number;
@@ -304,6 +317,7 @@ export interface ClinicData {
   inventory: InventoryItem[];
   expenses: ExpenseItem[];
   medications: Medication[];
+  medicationCategories?: MedicationCategory[]; // المجموعات الدوائية
   documentTemplates: DocumentTemplate[];
   labOrders: LabOrder[];
   labs: string[];
@@ -332,6 +346,8 @@ export interface ClinicData {
     rxTemplate?: {
         rxSymbol: TextStyleConfig;
         medications: TextStyleConfig;
+        headerInfo?: TextStyleConfig;
+        headerLine?: LineStyleConfig;
         topMargin?: number;
         paperSize?: 'A4' | 'A5';
     };
