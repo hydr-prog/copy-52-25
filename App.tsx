@@ -99,9 +99,6 @@ export default function App() {
   });
   const [activeThemeId, setActiveThemeId] = useState<string>(() => localStorage.getItem('dentro_theme_id') || 'classic');
 
-  const [rxBrowseView, setRxBrowseView] = useState<'search' | 'groups' | 'group_meds'>('search');
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
-
   const checkOnlineStatus = () => {
     if (!navigator.onLine) {
         throw new Error(deviceLang === 'ar' ? 'يجب أن تكون متصلاً بالإنترنت لتنفيذ هذه العملية لضمان الحفظ السحابي.' : 'You must be online to perform this operation to ensure cloud synchronization.');
@@ -109,9 +106,16 @@ export default function App() {
   };
 
   const syncToCloud = async (newData: ClinicData) => {
-    await supabaseService.saveData(newData);
-    setData(newData);
-    storageService.saveData(newData);
+    setSyncStatus('syncing');
+    try {
+      await supabaseService.saveData(newData);
+      setData(newData);
+      storageService.saveData(newData);
+      setSyncStatus('synced');
+    } catch (e) {
+      setSyncStatus('error');
+      throw e;
+    }
   };
 
   const mergeDataWithLocalPrefs = (externalData: ClinicData): ClinicData => {
@@ -169,15 +173,12 @@ export default function App() {
         if (result.error) {
             setAuthError(result.error.message);
         } else {
-            // تحميل البيانات فور نجاح تسجيل الدخول
             const cloudData = await supabaseService.loadData();
             if (cloudData) {
                 const finalData = mergeDataWithLocalPrefs(cloudData);
                 finalData.settings.isLoggedIn = true;
                 setData(finalData);
                 storageService.saveData(finalData);
-                
-                // التوجيه للبروفايلات إذا كانت العيادة معرفة، وإلا للتهيئة
                 setAppState(cloudData.clinicName ? 'profile_select' : 'app');
             }
         }
@@ -202,9 +203,10 @@ export default function App() {
   };
 
   const updatePatient = (id: string, updates: Partial<Patient>) => {
+    const ts = Date.now();
     updateLocalData(prev => ({
         ...prev,
-        patients: prev.patients.map(p => p.id === id ? { ...p, ...updates, updatedAt: Date.now() } : p)
+        patients: prev.patients.map(p => p.id === id ? { ...p, ...updates, updatedAt: ts } : p)
     }));
   };
 
@@ -245,6 +247,200 @@ export default function App() {
             return { ...p, updatedAt: ts, teeth: { ...p.teeth, [toothId]: { ...tooth, specialNote: { ...note, updatedAt: ts }, updatedAt: ts } } };
         })
     }));
+  };
+
+  const handleDeletePatient = async (id: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              patients: data.patients.filter(p => p.id !== id),
+              deletedIds: [...(data.deletedIds || []), id]
+          };
+          await syncToCloud(newData);
+          setSelectedPatientId(null);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteAppointment = async (patientId: string, appId: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          let newData;
+          if (patientId) {
+              newData = {
+                  ...data,
+                  lastUpdated: ts,
+                  patients: data.patients.map(p => p.id === patientId ? { ...p, appointments: p.appointments.filter(a => a.id !== appId), updatedAt: ts } : p),
+                  deletedIds: [...(data.deletedIds || []), appId]
+              };
+          } else {
+              newData = {
+                  ...data,
+                  lastUpdated: ts,
+                  guestAppointments: (data.guestAppointments || []).filter(a => a.id !== appId),
+                  deletedIds: [...(data.deletedIds || []), appId]
+              };
+          }
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleUpdateAppointmentStatus = async (patientId: string, appId: string, status: Appointment['status']) => {
+      const ts = Date.now();
+      try {
+          checkOnlineStatus();
+          let newData;
+          if (patientId) {
+              newData = {
+                  ...data,
+                  lastUpdated: ts,
+                  patients: data.patients.map(p => p.id === patientId ? { ...p, appointments: p.appointments.map(a => a.id === appId ? { ...a, status, updatedAt: ts } : a), updatedAt: ts } : p)
+              };
+          } else {
+              newData = {
+                  ...data,
+                  lastUpdated: ts,
+                  guestAppointments: (data.guestAppointments || []).map(a => a.id === appId ? { ...a, status, updatedAt: ts } : a)
+              };
+          }
+          await syncToCloud(newData);
+      } catch (err: any) { alert(err.message); }
+  };
+
+  const handleDeletePayment = async (patientId: string, payId: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              patients: data.patients.map(p => p.id === patientId ? { ...p, payments: p.payments.filter(pay => pay.id !== payId), updatedAt: ts } : p),
+              deletedIds: [...(data.deletedIds || []), payId]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteExamination = async (patientId: string, examId: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              patients: data.patients.map(p => p.id === patientId ? { ...p, examinations: (p.examinations || []).filter(ex => ex.id !== examId), updatedAt: ts } : p),
+              deletedIds: [...(data.deletedIds || []), examId]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteRx = async (rxId: string) => {
+      if (!selectedPatientId) return;
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              patients: data.patients.map(p => p.id === selectedPatientId ? { ...p, prescriptions: p.prescriptions.filter(r => r.id !== rxId), updatedAt: ts } : p),
+              deletedIds: [...(data.deletedIds || []), rxId]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteMemo = async (id: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              memos: data.memos.filter(m => m.id !== id),
+              deletedIds: [...(data.deletedIds || []), id]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteLabOrder = async (id: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              labOrders: data.labOrders.filter(o => o.id !== id),
+              deletedIds: [...(data.deletedIds || []), id]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteInventoryItem = async (id: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              inventory: data.inventory.filter(i => i.id !== id),
+              deletedIds: [...(data.deletedIds || []), id]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteSupply = async (id: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              supplies: data.supplies.filter(s => s.id !== id),
+              deletedIds: [...(data.deletedIds || []), id]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+      setIsProcessingDelete(true); setOpError(null);
+      try {
+          checkOnlineStatus();
+          const ts = Date.now();
+          const newData = {
+              ...data,
+              lastUpdated: ts,
+              expenses: data.expenses.filter(e => e.id !== id),
+              deletedIds: [...(data.deletedIds || []), id]
+          };
+          await syncToCloud(newData);
+      } catch (err: any) { setOpError(err.message); }
+      finally { setIsProcessingDelete(false); }
   };
 
   const handleSaveExaminationAsync = async (patientId: string, examData: Examination, isEdit: boolean) => {
@@ -348,8 +544,6 @@ export default function App() {
       } catch (err: any) { setOpError(err.message || 'Sync failed'); } finally { setIsProcessingPatient(false); }
   };
 
-  // ... باقي الدوال بدون تغيير ...
-
   const [confirmState, setConfirmState] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void; }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   const openConfirm = (title: string, message: string, onConfirm: () => void) => setConfirmState({ isOpen: true, title, message, onConfirm });
   const closeConfirm = () => { if (!isProcessingDelete) setConfirmState(prev => ({ ...prev, isOpen: false })); };
@@ -405,7 +599,7 @@ export default function App() {
          <div className="p-4 md:p-8 pb-20 max-w-7xl mx-auto">
              {currentView === 'dashboard' && !activeSecretaryId && <DashboardView t={currentT} data={data} allAppointments={allAppointments} setData={setData} activeDoctorId={activeDoctorId} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} />}
              {currentView === 'patients' && !selectedPatientId && <PatientsView t={currentT} data={filteredData} isRTL={isRTL} currentLang={deviceLang} setSelectedPatientId={setSelectedPatientId} setPatientTab={setPatientTab} setCurrentView={setCurrentView} setShowNewPatientModal={setShowNewPatientModal} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onAddAppointment={(pid) => { setApptPatientId(pid); setShowAppointmentModal(true); }} />}
-             {currentView === 'patients' && selectedPatientId && activePatient && <PatientDetails t={currentT} data={data} setData={setData} activePatient={activePatient} patientTab={patientTab} setPatientTab={setPatientTab} setSelectedPatientId={setSelectedPatientId} currentLang={deviceLang} isRTL={isRTL} updatePatient={updatePatient} handleDeletePatient={()=>{}} handleUpdateTooth={handleUpdateTooth} handleUpdateToothSurface={handleUpdateToothSurface} handleUpdateToothNote={handleUpdateToothNote} handleUpdateHead={()=>{}} handleUpdateBody={()=>{}} handleAddRCT={(pid, rct) => updatePatient(pid, { rootCanals: [...(activePatient.rootCanals || []), { ...rct, id: generateId(), updatedAt: Date.now() }] })} handleDeleteRCT={()=>{}} handleDeleteAppointment={()=>{}} handleUpdateAppointmentStatus={()=>{}} handleDeleteRx={(rxid) => {}} setPrintingRx={setPrintingRx} setPrintingPayment={setPrintingPayment} setPrintingAppointment={setPrintingAppointment} setPrintingExamination={setPrintingExamination} handleRxFileUpload={()=>{}} handleRemoveRxBg={()=>{}} setShowEditPatientModal={setShowEditPatientModal} setShowAppointmentModal={setShowAppointmentModal} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} 
+             {currentView === 'patients' && selectedPatientId && activePatient && <PatientDetails t={currentT} data={data} setData={setData} activePatient={activePatient} patientTab={patientTab} setPatientTab={setPatientTab} setSelectedPatientId={setSelectedPatientId} currentLang={deviceLang} isRTL={isRTL} updatePatient={updatePatient} handleDeletePatient={handleDeletePatient} handleUpdateTooth={handleUpdateTooth} handleUpdateToothSurface={handleUpdateToothSurface} handleUpdateToothNote={handleUpdateToothNote} handleUpdateHead={()=>{}} handleUpdateBody={()=>{}} handleAddRCT={(pid, rct) => updatePatient(pid, { rootCanals: [...(activePatient.rootCanals || []), { ...rct, id: generateId(), updatedAt: Date.now() }] })} handleDeleteRCT={(pid, rctid) => updatePatient(pid, { rootCanals: activePatient.rootCanals.filter(r => r.id !== rctid) })} handleDeleteAppointment={handleDeleteAppointment} handleUpdateAppointmentStatus={handleUpdateAppointmentStatus} handleDeleteRx={handleDeleteRx} setPrintingRx={setPrintingRx} setPrintingPayment={setPrintingPayment} setPrintingAppointment={setPrintingAppointment} setPrintingExamination={setPrintingExamination} handleRxFileUpload={()=>{}} handleRemoveRxBg={()=>{}} setShowEditPatientModal={setShowEditPatientModal} setShowAppointmentModal={setShowAppointmentModal} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} 
                 setShowPaymentModal={setShowPaymentModal} 
                 setPaymentType={setPaymentType} 
                 setSelectedPayment={setSelectedPayment}
@@ -415,19 +609,26 @@ export default function App() {
                 setPrintingDocument={setPrintingDocument} 
                 isSecretary={!!activeSecretaryId} 
                 handleSaveExamination={handleSaveExaminationAsync} 
-                handleDeleteExamination={async ()=>{}} 
-                handleDeletePayment={async ()=>{}}
+                handleDeleteExamination={handleDeleteExamination} 
+                handleDeletePayment={handleDeletePayment}
                 isProcessingExam={isProcessingExam} 
                 isProcessingFinance={isProcessingFinance} 
                 isProcessingAppt={isProcessingAppt} 
                 opError={opError} 
                 setOpError={setOpError} 
               />}
-             {/* باقي العروض ... */}
+             {currentView === 'calendar' && <CalendarView t={currentT} data={filteredData} currentLang={deviceLang} isRTL={isRTL} calendarView={calendarView} setCalendarView={setCalendarView} currentDate={currentDate} setCurrentDate={setCurrentDate} filteredAppointments={allAppointments} setSelectedAppointment={setSelectedAppointment} setAppointmentMode={setAppointmentMode} setShowAppointmentModal={setShowAppointmentModal} handleUpdateAppointmentStatus={handleUpdateAppointmentStatus} handleDeleteAppointment={handleDeleteAppointment} setSelectedPatientId={setSelectedPatientId} setCurrentView={setCurrentView} setPatientTab={setPatientTab} setGuestToConvert={setGuestToConvert} setShowNewPatientModal={setShowNewPatientModal} openConfirm={openConfirm} activeDoctorId={activeDoctorId} isSecretary={!!activeSecretaryId} />}
+             {currentView === 'memos' && <MemosView t={currentT} data={data} setSelectedMemo={setSelectedMemo} setShowMemoModal={setShowMemoModal} setMemoType={setMemoType} setTempTodos={setTempTodos} handleDeleteMemo={handleDeleteMemo} currentLang={deviceLang} openConfirm={openConfirm} />}
+             {currentView === 'purchases' && <PurchasesView t={currentT} data={data} setSelectedSupply={setSelectedSupply} setShowSupplyModal={setShowSupplyModal} handleConvertToExpense={()=>{}} handleDeleteSupply={handleDeleteSupply} openConfirm={openConfirm} />}
+             {currentView === 'inventory' && <InventoryView t={currentT} data={data} setSelectedInventoryItem={setSelectedInventoryItem} setShowInventoryModal={setShowInventoryModal} handleDeleteInventoryItem={handleDeleteInventoryItem} openConfirm={openConfirm} />}
+             {currentView === 'expenses' && <ExpensesView t={currentT} data={data} setData={setData} setSelectedExpense={setSelectedExpense} setShowExpenseModal={setShowExpenseModal} handleDeleteExpense={handleDeleteExpense} openConfirm={openConfirm} />}
+             {currentView === 'labOrders' && <LabOrdersView t={currentT} data={data} setData={setData} setSelectedLabOrder={setSelectedLabOrder} setShowLabOrderModal={setShowLabOrderModal} handleDeleteLabOrder={handleDeleteLabOrder} handleUpdateLabOrderStatus={()=>{}} openConfirm={openConfirm} currentLang={deviceLang} />}
+             {currentView === 'settings' && <SettingsView t={currentT} data={data} setData={setData} handleAddDoctor={()=>{}} handleUpdateDoctor={()=>{}} handleDeleteDoctor={()=>{}} handleAddSecretary={()=>{}} handleDeleteSecretary={()=>{}} handleRxFileUpload={()=>{}} handleImportData={()=>{}} syncStatus={syncStatus} deferredPrompt={deferredPrompt} handleInstallApp={()=>{}} openConfirm={openConfirm} currentLang={deviceLang} setDeviceLang={setDeviceLang} currentTheme={data.settings.theme as any} setLocalTheme={(t) => updateLocalData(prev => ({...prev, settings: {...prev.settings, theme: t}}))} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} deviceScale={deviceScale} setDeviceScale={setDeviceScale} onLinkDrive={()=>{}} />}
          </div>
       </main>
 
-      {/* المودالات ... */}
+      <PrintLayouts t={currentT} data={data} activePatient={activePatient} printingRx={printingRx} setPrintingRx={setPrintingRx} printingPayment={printingPayment} setPrintingPayment={setPrintingPayment} printingAppointment={printingAppointment} setPrintingAppointment={setPrintingAppointment} printingExamination={printingExamination} setPrintingExamination={setPrintingExamination} printingDocument={printingDocument} setPrintingDocument={setPrintingDocument} currentLang={deviceLang} isRTL={isRTL} />
+
       <PatientModal 
         show={showNewPatientModal || showEditPatientModal} 
         onClose={() => { if(!isProcessingPatient) { setShowNewPatientModal(false); setShowEditPatientModal(false); } }} 

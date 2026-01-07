@@ -56,8 +56,7 @@ export const supabaseService = {
           return null;
       }
 
-      // إزالة .order('updated_at') لأن العمود غير موجود في الجدول
-      // نعتمد على user_id كمعرف فريد لجلب سجل المريض
+      // جلب السجل الخاص بالمستخدم
       const { data, error } = await supabase
         .from('user_data')
         .select('*')
@@ -75,7 +74,7 @@ export const supabaseService = {
         return INITIAL_DATA;
       }
 
-      // Parse content securely
+      // معالجة محتوى البيانات
       let content = data.content || {};
       if (typeof content === 'string') {
           try {
@@ -86,7 +85,7 @@ export const supabaseService = {
           }
       }
       
-      // Merge separated RX image data if exists
+      // دمج صورة الوصفة الطبية إذا كانت مخزنة في الحقل المنفصل
       if (data['RX json']) {
           const rxData = data['RX json'];
           if (rxData && rxData.image) {
@@ -116,33 +115,42 @@ export const supabaseService = {
             lastUpdated: Date.now()
         };
 
-        // إزالة updated_at من الـ payload لتجنب الخطأ
         const payload = {
             user_id: user.id,
             content: dataToSave,
             "RX json": { image: clinicData.settings.rxBackgroundImage || '' }
         };
 
-        const { error } = await supabase
-          .from('user_data')
-          .upsert(payload, { onConflict: 'user_id' });
-
-        if (error) {
-          console.error('Upsert failed:', error.message || JSON.stringify(error));
-          
-          // Fallback manual check
-          const { data: existing, error: fetchError } = await supabase
+        // بدلاً من استخدام upsert الذي يتطلب unique constraint
+        // نقوم بالتحقق يدوياً ثم التحديث أو الإدخال لتجنب خطأ ON CONFLICT
+        const { data: existing, error: fetchError } = await supabase
             .from('user_data')
             .select('id')
             .eq('user_id', user.id)
             .maybeSingle();
 
-          if (existing) {
-              await supabase.from('user_data').update(payload).eq('id', existing.id);
-          } else if (!fetchError) {
-              await supabase.from('user_data').insert(payload);
-          }
+        if (fetchError) {
+            console.error('Error checking existing data for save:', fetchError.message);
+            return;
         }
+
+        if (existing) {
+            // تحديث السجل الحالي
+            const { error: updateError } = await supabase
+                .from('user_data')
+                .update(payload)
+                .eq('id', existing.id);
+            
+            if (updateError) console.error('Error updating data:', updateError.message);
+        } else {
+            // إدخال سجل جديد
+            const { error: insertError } = await supabase
+                .from('user_data')
+                .insert(payload);
+            
+            if (insertError) console.error('Error inserting data:', insertError.message);
+        }
+        
     } catch (err: any) {
         console.error('Critical failure in saveData:', err.message || String(err));
     }
