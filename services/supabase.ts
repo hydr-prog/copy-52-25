@@ -35,124 +35,111 @@ export const supabaseService = {
         .from('user_data')
         .select('id')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .limit(1);
 
       if (error) {
-          console.error('Account check error:', error.message || JSON.stringify(error));
-          return { exists: true, error: true };
+        console.error('Check Account Status Error:', error.message);
+        return { exists: true, error: true };
       }
-      return { exists: !!data, error: false };
+      return { exists: data && data.length > 0, error: false };
     } catch (e: any) {
-      console.error('Unexpected account check error:', e.message || String(e));
+      console.error('Check Account Status Exception:', e.message || String(e));
       return { exists: true, error: true };
     }
   },
 
   loadData: async (): Promise<ClinicData | null> => {
-    try {
-      const user = await supabaseService.getUser();
-      if (!user) {
-          console.warn('LoadData called without an active session.');
-          return null;
-      }
+    const user = await supabaseService.getUser();
+    if (!user) return null;
 
-      // جلب السجل الخاص بالمستخدم
-      const { data, error } = await supabase
-        .from('user_data')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from('user_data')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('id', { ascending: false })
+      .limit(1);
 
-      if (error) {
-        console.error(`Database load error: ${error.message} (Code: ${error.code})`);
-        console.error('Full Error Object:', JSON.stringify(error, null, 2));
-        return null;
-      }
-
-      if (!data) {
-        console.log('No cloud data found for user, returning INITIAL_DATA');
-        return INITIAL_DATA;
-      }
-
-      // معالجة محتوى البيانات
-      let content = data.content || {};
-      if (typeof content === 'string') {
-          try {
-              content = JSON.parse(content);
-          } catch (e) {
-              console.error('Error parsing content JSON from DB:', e);
-              content = {};
-          }
-      }
-      
-      // دمج صورة الوصفة الطبية إذا كانت مخزنة في الحقل المنفصل
-      if (data['RX json']) {
-          const rxData = data['RX json'];
-          if (rxData && rxData.image) {
-              if (!content.settings) content.settings = { ...INITIAL_DATA.settings };
-              content.settings.rxBackgroundImage = rxData.image;
-          }
-      }
-
-      return { 
-          ...INITIAL_DATA, 
-          ...content,
-          lastUpdated: content.lastUpdated || 0
-      };
-    } catch (err: any) {
-        console.error('Critical failure in loadData:', err.message || String(err));
-        return null;
+    if (error) {
+      console.error('Error loading data:', error.message, error.details);
+      return null;
     }
+
+    if (!data || data.length === 0) {
+      return INITIAL_DATA;
+    }
+
+    const row = data[0];
+    const content = row.content || {};
+    
+    if (row['RX json']) {
+        const rxData = row['RX json'];
+        if (rxData && rxData.image) {
+            if (!content.settings) content.settings = { ...INITIAL_DATA.settings };
+            content.settings.rxBackgroundImage = rxData.image;
+        }
+    } else if (row.rx && typeof row.rx === 'string') {
+        if (!content.settings) content.settings = { ...INITIAL_DATA.settings };
+        content.settings.rxBackgroundImage = row.rx;
+    }
+
+    const cloudTimestamp = content.lastUpdated || 0;
+
+    return { 
+        ...INITIAL_DATA, 
+        ...content,
+        lastUpdated: cloudTimestamp
+    };
   },
 
   saveData: async (clinicData: ClinicData) => {
-    try {
-        const user = await supabaseService.getUser();
-        if (!user) return;
+    const user = await supabaseService.getUser();
+    if (!user) return;
 
-        const dataToSave = {
-            ...clinicData,
-            lastUpdated: Date.now()
-        };
+    const dataToSave = {
+        ...clinicData,
+        lastUpdated: Date.now()
+    };
 
-        const payload = {
-            user_id: user.id,
-            content: dataToSave,
-            "RX json": { image: clinicData.settings.rxBackgroundImage || '' }
-        };
+    const payload = {
+        user_id: user.id,
+        content: dataToSave,
+        "RX json": { image: clinicData.settings.rxBackgroundImage }
+    };
 
-        // بدلاً من استخدام upsert الذي يتطلب unique constraint
-        // نقوم بالتحقق يدوياً ثم التحديث أو الإدخال لتجنب خطأ ON CONFLICT
-        const { data: existing, error: fetchError } = await supabase
+    // Manual 'Upsert' logic to avoid reliance on unique constraints that might be missing in DB
+    // Step 1: Check for existing record
+    const { data: existingRows, error: fetchError } = await supabase
+        .from('user_data')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('id', { ascending: false })
+        .limit(1);
+
+    if (fetchError) {
+        console.error('Error checking for existing record:', fetchError.message);
+        throw new Error(fetchError.message || 'Failed to check existing data');
+    }
+
+    let saveError;
+    if (existingRows && existingRows.length > 0) {
+        // Step 2a: Update existing row
+        const { error: updateError } = await supabase
             .from('user_data')
-            .select('id')
-            .eq('user_id', user.id)
-            .maybeSingle();
+            .update(payload)
+            .eq('id', existingRows[0].id);
+        saveError = updateError;
+    } else {
+        // Step 2b: Insert new row
+        const { error: insertError } = await supabase
+            .from('user_data')
+            .insert(payload);
+        saveError = insertError;
+    }
 
-        if (fetchError) {
-            console.error('Error checking existing data for save:', fetchError.message);
-            return;
-        }
-
-        if (existing) {
-            // تحديث السجل الحالي
-            const { error: updateError } = await supabase
-                .from('user_data')
-                .update(payload)
-                .eq('id', existing.id);
-            
-            if (updateError) console.error('Error updating data:', updateError.message);
-        } else {
-            // إدخال سجل جديد
-            const { error: insertError } = await supabase
-                .from('user_data')
-                .insert(payload);
-            
-            if (insertError) console.error('Error inserting data:', insertError.message);
-        }
-        
-    } catch (err: any) {
-        console.error('Critical failure in saveData:', err.message || String(err));
+    if (saveError) {
+        const errorInfo = `Code: ${saveError.code}, Message: ${saveError.message}, Details: ${saveError.details}`;
+        console.error('Error saving data to Supabase:', errorInfo);
+        throw new Error(saveError.message || 'Database sync failed');
     }
   }
 };

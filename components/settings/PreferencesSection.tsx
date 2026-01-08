@@ -42,16 +42,12 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
       setVerificationError(null);
 
       try {
-          // Actual Validation Call to Gemini API
           const ai = new GoogleGenAI({ apiKey: key });
-          
-          // Test with a tiny token generation
           await ai.models.generateContent({
               model: 'gemini-3-flash-preview',
               contents: 'hi',
           });
 
-          // If successful, save to global state
           setData(prev => ({
               ...prev,
               settings: { ...prev.settings, geminiApiKey: key },
@@ -74,6 +70,10 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
       } finally {
           setIsVerifying(false);
       }
+  };
+
+  const toggleThemeMode = () => {
+    setLocalTheme(currentTheme === 'light' ? 'dark' : 'light');
   };
 
   return (
@@ -101,7 +101,7 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
                       <div className="p-2.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-xl shadow-inner"><Moon size={20} /></div>
                       <span className="font-black text-gray-700 dark:text-gray-300 text-lg">{t.darkMode}</span>
                   </div>
-                  <button onClick={() => setLocalTheme(currentTheme === 'light' ? 'dark' : 'light')} className={`w-16 h-10 rounded-full p-1.5 transition-all duration-500 flex items-center ${currentTheme === 'dark' ? 'bg-primary-600 justify-end' : 'bg-gray-200 justify-start shadow-inner'}`}><div className="w-7 h-7 rounded-full bg-white shadow-xl flex items-center justify-center text-gray-700 transform transition-transform duration-500">{currentTheme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}</div></button>
+                  <button onClick={toggleThemeMode} className={`w-16 h-10 rounded-full p-1.5 transition-all duration-500 flex items-center ${currentTheme === 'dark' ? 'bg-primary-600 justify-end' : 'bg-gray-200 justify-start shadow-inner'}`}><div className="w-7 h-7 rounded-full bg-white shadow-xl flex items-center justify-center text-gray-700 transform transition-transform duration-500">{currentTheme === 'dark' ? <Moon size={16} /> : <Sun size={16} />}</div></button>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-t border-gray-100 dark:border-gray-600 pt-6 gap-4">
                   <div className="flex items-center gap-3">
@@ -116,7 +116,7 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
        {/* AI Section Anchor */}
        <div id="ai-section-anchor" className="scroll-mt-20"></div>
 
-       {/* 2. AI Setup Section - MODIFIED FOR PERMANENT FEEDBACK */}
+       {/* 2. AI Setup Section */}
        <div className="bg-white dark:bg-gray-800 p-8 rounded-[3rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-8 relative overflow-hidden">
           <Sparkles className="absolute top-8 end-8 text-indigo-100 dark:text-indigo-900 opacity-50" size={80} />
           
@@ -145,7 +145,6 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
                       </div>
                   </div>
 
-                  {/* Step 3 - Interactive Key Input with Save Button */}
                   <div className="flex gap-4 p-5 bg-fuchsia-50 dark:bg-fuchsia-900/20 rounded-3xl border border-fuchsia-100 dark:border-fuchsia-800 min-h-[120px] items-center">
                       <div className="w-10 h-10 bg-fuchsia-600 text-white rounded-full flex items-center justify-center font-black shrink-0 shadow-lg">3</div>
                       <div className="flex-1">
@@ -186,12 +185,11 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
                                           </button>
                                       </div>
                                       
-                                      {/* New Confirm Button next to input */}
                                       <button 
                                         type="button"
-                                        onClick={() => setIsEditingKey(false)}
-                                        className="p-4 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition active:scale-90"
-                                        title={isRTL ? "تأكيد" : "Confirm"}
+                                        onClick={handleActivateKey}
+                                        disabled={isVerifying || !apiKeyInput.trim()}
+                                        className="p-4 bg-green-500 text-white rounded-xl shadow-lg hover:bg-green-600 transition active:scale-90 disabled:opacity-50"
                                       >
                                         <Check size={20} />
                                       </button>
@@ -210,28 +208,15 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
                   </div>
               </div>
 
-              {/* Main Activation Button Area */}
+              {/* Main Activation Feedback */}
               <div className="space-y-4">
-                  <button 
-                    onClick={handleActivateKey}
-                    disabled={isVerifying || !apiKeyInput.trim()}
-                    className="w-full py-5 bg-gradient-to-r from-indigo-600 to-purple-600 disabled:opacity-50 text-white rounded-[2rem] font-black text-xl shadow-xl shadow-indigo-500/20 hover:opacity-90 transition transform active:scale-95 flex items-center justify-center gap-3"
-                  >
-                    {isVerifying ? (
-                        <>
-                            <Loader2 size={26} className="animate-spin" />
-                            <span>{isRTL ? "جاري التحقق..." : "Verifying..."}</span>
-                        </>
-                    ) : (
-                        <>
-                            <CloudCheck size={26} />
-                            <span>{isRTL ? "تفعيل المفتاح الآن" : "Activate Key Now"}</span>
-                        </>
-                    )}
-                  </button>
-
-                  {/* PERMANENT FEEDBACK MESSAGE UNDER THE BUTTON */}
                   <div className="min-h-[60px] animate-fade-in">
+                      {isVerifying && (
+                          <div className="flex flex-col items-center justify-center py-4">
+                              <Loader2 size={32} className="animate-spin text-indigo-600 mb-2" />
+                              <p className="text-xs font-bold text-gray-400">{isRTL ? "جاري التحقق..." : "Verifying..."}</p>
+                          </div>
+                      )}
                       {activationStatus === 'success' && (
                           <div className="p-4 bg-green-50 dark:bg-green-900/20 border-2 border-green-100 dark:border-green-800 rounded-2xl flex items-center gap-3 text-green-700 dark:text-green-300">
                               <CheckCircle2 size={24} className="shrink-0" />
@@ -248,12 +233,6 @@ export const PreferencesSection: React.FC<PreferencesSectionProps> = ({
                                   {verificationError}
                               </div>
                           </div>
-                      )}
-
-                      {activationStatus === 'none' && !isVerifying && (
-                          <p className="text-center text-[10px] text-gray-400 font-black uppercase tracking-[0.2em]">
-                             {isRTL ? "سيتم اختبار المفتاح قبل الحفظ" : "Key will be tested before saving"}
-                          </p>
                       )}
                   </div>
               </div>
