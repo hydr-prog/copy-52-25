@@ -39,10 +39,11 @@ interface SettingsViewProps {
   deviceScale: number;
   setDeviceScale: (scale: number) => void;
   onLinkDrive: () => void;
+  onUpdateSettings: (settings: Partial<ClinicData['settings']>) => Promise<void>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = (props) => {
-  const { t, data, setData, handleAddDoctor, handleUpdateDoctor, handleDeleteDoctor, handleAddSecretary, handleDeleteSecretary, handleImportData, deferredPrompt, handleInstallApp, openConfirm, currentLang, setDeviceLang, currentTheme, setLocalTheme, activeThemeId, setActiveThemeId, activeDoctorId, activeSecretaryId, deviceScale, setDeviceScale, onLinkDrive } = props;
+  const { t, data, setData, handleAddDoctor, handleUpdateDoctor, handleDeleteDoctor, handleAddSecretary, handleDeleteSecretary, handleImportData, deferredPrompt, handleInstallApp, openConfirm, currentLang, setDeviceLang, currentTheme, setLocalTheme, activeThemeId, setActiveThemeId, activeDoctorId, activeSecretaryId, deviceScale, setDeviceScale, onLinkDrive, onUpdateSettings } = props;
   
   const [isEditingClinic, setIsEditingClinic] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
@@ -277,7 +278,7 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
           </div>
 
           <div id="preferences-mgmt" className="scroll-mt-10 animate-fade-in">
-            <PreferencesSection t={t} data={data} setData={setData} deviceScale={deviceScale} setDeviceScale={setDeviceScale} adjustScale={adjustScale} currentTheme={currentTheme} setLocalTheme={setLocalTheme} currentLang={currentLang} setDeviceLang={setDeviceLang} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} isRTL={isRTL} />
+            <PreferencesSection t={t} data={data} setData={setData} deviceScale={deviceScale} setDeviceScale={setDeviceScale} adjustScale={adjustScale} currentTheme={currentTheme} setLocalTheme={setLocalTheme} currentLang={currentLang} setDeviceLang={setDeviceLang} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} isRTL={isRTL} onUpdateSettings={onUpdateSettings} />
           </div>
 
           <div id="install-section" className="scroll-mt-10 animate-fade-in">

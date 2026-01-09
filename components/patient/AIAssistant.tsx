@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Sparkles, X, BrainCircuit, Loader2, Info, AlertCircle, CloudCheck, Zap, ShieldCheck, Settings2, ArrowRightCircle } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { Sparkles, X, BrainCircuit, Loader2, Info, AlertCircle, CloudCheck, Zap, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { aiService } from '../../services/aiService';
 import { Patient, ClinicData, Tooth } from '../../types';
 import { PATIENT_QUESTIONS_LIST } from '../../constants';
 
@@ -13,7 +14,7 @@ interface AIAssistantProps {
   onClose: () => void;
 }
 
-export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData, t, onClose }) => {
+export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, t, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -21,19 +22,15 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
   const isRTL = data.settings.language === 'ar' || data.settings.language === 'ku';
   const fontClass = isRTL ? 'font-cairo' : 'font-sans';
   
-  const syncedApiKey = data.settings.geminiApiKey;
-  const isActivated = !!syncedApiKey;
+  // الذكاء مفعل تلقائياً الآن بالمفاتيح الداخلية
+  const isActivated = true;
 
   const generateInsights = async () => {
-    if (!syncedApiKey) return;
-
     setLoading(true);
     setErrorMsg(null);
     setInsight(null);
     
     try {
-      const ai = new GoogleGenAI({ apiKey: syncedApiKey });
-      
       // 1. Detailed Teeth & Surfaces Status
       const teethData = Object.entries(patient.teeth)
         .map(([id, t]) => {
@@ -90,20 +87,11 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
         
         INSTRUCTION: ${t.aiInstruction}`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-      });
-
-      if (!response.text) throw new Error("No response");
-      setInsight(response.text);
+      const text = await aiService.generateInsights(prompt);
+      setInsight(text);
     } catch (error: any) {
       console.error("AI Error:", error);
-      if (error.message?.includes('API_KEY_INVALID')) {
-          setErrorMsg(isRTL ? "مفتاح الـ API غير صحيح. يرجى التأكد منه في الإعدادات." : "Invalid API Key. Please check your settings.");
-      } else {
-          setErrorMsg(isRTL ? "فشل الاتصال بالذكاء الاصطناعي." : "AI engine connection failed.");
-      }
+      setErrorMsg(isRTL ? "فشل الاتصال بمحرك الذكاء الاصطناعي. يرجى المحاولة لاحقاً." : "AI engine connection failed. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -126,7 +114,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
               <div className="flex items-center gap-1 opacity-70">
                  <CloudCheck size={12} />
                  <p className="text-[9px] uppercase tracking-widest font-black">
-                    {isActivated ? (isRTL ? "نظام الذكاء مفعل" : "AI System Active") : (isRTL ? "تفعيل الخدمة مطلوب" : "Activation Required")}
+                    {isRTL ? "نظام الذكاء مفعل وآمن" : "AI System Active & Secure"}
                  </p>
               </div>
             </div>
@@ -138,39 +126,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
 
         {/* Content Body */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10">
-          {!isActivated ? (
-            <div className="text-center py-6 space-y-8 animate-fade-in">
-               <div className="w-24 h-24 bg-amber-50 dark:bg-amber-900/20 text-amber-500 rounded-[2.5rem] flex items-center justify-center mx-auto mb-2 shadow-inner">
-                 <Settings2 size={48} />
-               </div>
-               
-               <div>
-                 <h4 className="text-3xl font-black text-gray-800 dark:text-white mb-4">{isRTL ? "يتطلب التفعيل أولاً" : "Activation Required"}</h4>
-                 <div className="max-w-sm mx-auto p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 space-y-4">
-                    <p className="text-gray-600 dark:text-gray-400 text-sm font-bold leading-relaxed">
-                      {isRTL 
-                        ? "ميزة الذكاء الاصطناعي تحتاج إلى ربط مفتاح API الخاص بك لتعمل. يرجى اتباع الخطوات التالية:" 
-                        : "AI features need an API key to function. Please follow these steps:"}
-                    </p>
-                    <div className="flex items-start gap-3 text-start">
-                        <div className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">1</div>
-                        <p className="text-xs text-gray-500 font-bold">{isRTL ? "اذهب إلى القائمة الجانبية ثم 'الإعدادات'" : "Go to Sidebar then 'Settings'"}</p>
-                    </div>
-                    <div className="flex items-start gap-3 text-start">
-                        <div className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">2</div>
-                        <p className="text-xs text-gray-500 font-bold">{isRTL ? "ابحث عن قسم 'مساعد الذكاء الاصطناعي' وقم بإكمال الربط" : "Find 'AI Assistant' section and complete the link"}</p>
-                    </div>
-                 </div>
-               </div>
-
-               <div className="pt-4 flex justify-center">
-                  <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 text-sm font-black animate-pulse uppercase tracking-widest">
-                     <ArrowRightCircle size={20} className="rtl:rotate-180" />
-                     {isRTL ? "الرجاء الإعداد من قائمة الإعدادات" : "Please configure in Settings"}
-                  </div>
-               </div>
-            </div>
-          ) : loading ? (
+          {loading ? (
             <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
               <div className="relative mb-8">
                 <Loader2 size={80} className="animate-spin text-indigo-600 opacity-20" />
@@ -190,7 +146,7 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
                 </div>
                 <div className="bg-green-100 dark:bg-green-900/30 text-green-600 px-3 py-1 rounded-full text-[10px] font-black flex items-center gap-1 uppercase tracking-tighter">
                    <ShieldCheck size={12}/> 
-                   {isRTL ? "تم التحقق من التحليل" : "Analysis Verified"}
+                   {isRTL ? "تحليل موثوق" : "Verified Analysis"}
                 </div>
               </div>
 
@@ -247,8 +203,8 @@ export const AIAssistant: React.FC<AIAssistantProps> = ({ patient, data, setData
                 </button>
                 
                 <div className="flex items-center justify-center gap-2 text-gray-400 text-[10px] font-black uppercase tracking-widest group">
-                    <CloudCheck size={14} className="text-green-500" />
-                    <span>{isRTL ? "الحساب مرتبط وجاهز للعمل" : "Account Linked & Ready"}</span>
+                    <CheckCircle2 size={14} className="text-green-500" />
+                    <span>{isRTL ? "خدمة الذكاء الاصطناعي نشطة" : "AI Service Active"}</span>
                 </div>
               </div>
             </div>

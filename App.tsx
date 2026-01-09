@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud, LayoutGrid, Folder, ChevronLeft, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { ClinicData, Doctor, Secretary, Patient, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle, Examination, MedicalConditionItem, PatientQueryAnswer, MedicationCategory } from './types';
@@ -134,6 +135,13 @@ export default function App() {
           syncToCloud(next); 
           return next;
       });
+  };
+
+  const handleUpdateSettings = async (settings: Partial<ClinicData['settings']>) => {
+      await updateAndSync(prev => ({
+          ...prev,
+          settings: { ...prev.settings, ...settings }
+      }));
   };
 
   const handleManualSync = async (force: boolean = false) => {
@@ -489,12 +497,12 @@ export default function App() {
       } catch (e: any) { console.warn("Initial sync failed, using local."); }
       
       const currentData = storageService.loadData();
+      // Always show Profile Selector upon initialization if ClinicName exists
       if (currentData && currentData.clinicName) {
-          const savedProfileType = localStorage.getItem('dentro_profile_type');
-          if (savedProfileType === 'doctor') setActiveDoctorId(localStorage.getItem('dentro_active_profile'));
-          else if (savedProfileType === 'secretary') { setActiveSecretaryId(localStorage.getItem('dentro_active_secretary')); setCurrentView('patients'); }
-          setAppState('app');
-      } else setAppState('app');
+          setAppState('profile_select');
+      } else {
+          setAppState('app'); // This will trigger ClinicSetup inside 'app' render
+      }
       setIsInitialLoading(false);
     };
     initApp();
@@ -512,6 +520,7 @@ export default function App() {
                 setData(newData); 
                 storageService.saveData(newData); 
                 setIsInitialLoading(false); 
+                // Redirect based on clinic setup
                 setAppState(cloudData.clinicName ? 'profile_select' : 'app');
             }
         }
@@ -520,6 +529,7 @@ export default function App() {
 
   const handleClinicNameSubmit = async (name: string) => { 
     await updateAndSync(prev => ({ ...prev, clinicName: name })); 
+    // After setup, always go to profile select
     setAppState('profile_select'); 
   };
 
@@ -785,6 +795,25 @@ export default function App() {
   if (appState === 'auth') return <AuthScreen t={currentT} loginEmail={loginEmail} setLoginEmail={setLoginEmail} loginPassword={loginPassword} setLoginPassword={setLoginPassword} authLoading={authLoading} authError={authError} handleAuth={handleAuth} setAppState={setAppState} />;
   if (appState === 'profile_select') return <ProfileSelector t={currentT} data={data} loginPassword={loginPassword} currentLang={deviceLang} isRTL={isRTL} onSelectAdmin={() => { localStorage.setItem('dentro_profile_type', 'admin'); setAppState('app'); }} onSelectDoctor={(id) => { setActiveDoctorId(id); localStorage.setItem('dentro_profile_type', 'doctor'); localStorage.setItem('dentro_active_profile', id); setAppState('app'); }} onSelectSecretary={(id) => { setActiveSecretaryId(id); localStorage.setItem('dentro_profile_type', 'secretary'); localStorage.setItem('dentro_active_secretary', id); setAppState('app'); setCurrentView('patients'); }} onLogout={() => { supabaseService.signOut(); localStorage.clear(); setAppState('landing'); }} />;
 
+  // If in 'app' state but no clinic name, show setup
+  if (appState === 'app' && !data.clinicName) {
+      return (
+        <ClinicSetup 
+            t={currentT} 
+            data={data} 
+            setData={setData} 
+            onboardingStep={1} 
+            setOnboardingStep={() => {}} 
+            handleClinicNameSubmit={handleClinicNameSubmit} 
+            handleAddDoctor={() => {}} 
+            handleDeleteDoctor={() => {}} 
+            handleFinishSetup={() => {}} 
+            isRTL={isRTL} 
+            openConfirm={openConfirm} 
+        />
+      );
+  }
+
   return (
     <div className={`min-h-screen flex bg-page-bg font-${isRTL ? 'cairo' : 'sans'} leading-relaxed overflow-hidden`} dir={isRTL ? 'rtl' : 'ltr'}>
       <ConfirmationModal 
@@ -846,12 +875,12 @@ export default function App() {
                 currentTheme={activeThemeId === 'classic' ? 'light' : 'dark'} 
                 setLocalTheme={(t) => setActiveThemeId(t === 'dark' ? 'dark-pro' : 'classic')} 
                 activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} activeDoctorId={activeDoctorId} activeSecretaryId={activeSecretaryId} deviceScale={deviceScale} setDeviceScale={setDeviceScale} 
-                onLinkDrive={handleLinkDrive} 
+                onLinkDrive={handleLinkDrive} onUpdateSettings={handleUpdateSettings}
              />}
          </div>
       </main>
 
-      <PrintLayouts t={currentT} data={data} activePatient={activePatient} printingRx={printingRx} setPrintingRx={setPrintingRx} printingPayment={printingPayment} setPrintingPayment={setPrintingPayment} printingAppointment={printingAppointment} setPrintingAppointment={setPrintingAppointment} printingExamination={printingExamination} setPrintingExamination={setPrintingExamination} currentLang={deviceLang} isRTL={isRTL} />
+      <PrintLayouts t={currentT} data={data} activePatient={activePatient} printingRx={printingRx} setPrintingRx={setPrintingRx} printingPayment={printingPayment} setPrintingPayment={setPrintingPayment} printingAppointment={printingAppointment} setPrintingAppointment={setPrintingAppointment} printingExamination={printingExamination} setPrintingExamination={setPrintingExamination} printingDocument={printingDocument} setPrintingDocument={setPrintingDocument} currentLang={deviceLang} isRTL={isRTL} />
       
       <PatientModal 
         show={showNewPatientModal || showEditPatientModal} 
