@@ -499,7 +499,34 @@ export default function App() {
       const currentData = storageService.loadData();
       // Always show Profile Selector upon initialization if ClinicName exists
       if (currentData && currentData.clinicName) {
-          setAppState('profile_select');
+          // Check for persisted active profile to bypass selection screen
+          const savedProfileType = localStorage.getItem('dentro_profile_type');
+          if (savedProfileType) {
+              if (savedProfileType === 'admin') {
+                  setAppState('app');
+              } else if (savedProfileType === 'doctor') {
+                  const docId = localStorage.getItem('dentro_active_profile');
+                  if (docId) {
+                      setActiveDoctorId(docId);
+                      setAppState('app');
+                  } else {
+                      setAppState('profile_select');
+                  }
+              } else if (savedProfileType === 'secretary') {
+                  const secId = localStorage.getItem('dentro_active_secretary');
+                  if (secId) {
+                      setActiveSecretaryId(secId);
+                      setAppState('app');
+                      setCurrentView('patients');
+                  } else {
+                      setAppState('profile_select');
+                  }
+              } else {
+                  setAppState('profile_select');
+              }
+          } else {
+              setAppState('profile_select');
+          }
       } else {
           setAppState('app'); // This will trigger ClinicSetup inside 'app' render
       }
@@ -783,13 +810,22 @@ export default function App() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 font-cairo">
       <Logo className="w-24 h-24 mb-6" />
       <div className="w-48 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden mb-4">
-        <div className="h-full bg-primary-500 w-1/2 animate-[pulse_1s_ease-in-out_infinite]"></div>
+        <div className="h-full bg-primary-500 w-0 animate-progress-fill"></div>
       </div>
-      <p className="text-gray-500 dark:text-gray-400 font-bold animate-pulse text-sm">
+      <p className="text-gray-500 dark:text-gray-400 font-bold text-sm">
         {deviceLang === 'ar' ? 'جاري المزامنة، يرجى الانتظار قليلاً...' : deviceLang === 'ku' ? 'خەریکی هاوکاتکردنە، تکایە کەمێک چاوەڕوان بن...' : 'Syncing, please wait a moment...'}
       </p>
     </div>
   );
+
+  const handleLogout = () => {
+      setActiveDoctorId(null);
+      setActiveSecretaryId(null);
+      localStorage.removeItem('dentro_profile_type');
+      localStorage.removeItem('dentro_active_profile');
+      localStorage.removeItem('dentro_active_secretary');
+      setAppState('profile_select');
+  };
 
   if (appState === 'landing') return <LandingPage setAppState={setAppState} landingLang={landingLang} setLandingLang={setLandingLang} isRTL={isRTL} />;
   if (appState === 'auth') return <AuthScreen t={currentT} loginEmail={loginEmail} setLoginEmail={setLoginEmail} loginPassword={loginPassword} setLoginPassword={setLoginPassword} authLoading={authLoading} authError={authError} handleAuth={handleAuth} setAppState={setAppState} />;
@@ -828,7 +864,7 @@ export default function App() {
         lang={deviceLang}
         isLoading={isProcessingDelete}
       />
-      <Sidebar t={currentT} data={data} currentView={currentView} setCurrentView={(view) => { if(view !== currentView) pushNavState(); setCurrentView(view); }} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} setSelectedPatientId={setSelectedPatientId} handleLogout={() => { setActiveDoctorId(null); setActiveSecretaryId(null); setAppState('profile_select'); }} isRTL={isRTL} isSecretary={!!activeSecretaryId} handleManualSync={handleManualSync} syncStatus={syncStatus} />
+      <Sidebar t={currentT} data={data} currentView={currentView} setCurrentView={(view) => { if(view !== currentView) pushNavState(); setCurrentView(view); }} isSidebarOpen={isSidebarOpen} setSidebarOpen={setSidebarOpen} setSelectedPatientId={setSelectedPatientId} handleLogout={handleLogout} isRTL={isRTL} isSecretary={!!activeSecretaryId} handleManualSync={handleManualSync} syncStatus={syncStatus} />
       
       <main className="flex-1 h-screen overflow-y-auto custom-scrollbar relative">
          <div className="lg:hidden p-4 flex justify-between items-center bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-30">

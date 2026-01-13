@@ -90,8 +90,8 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
     { id: 'sync-mgmt', label: t.cloudSync, icon: Cloud, color: 'text-orange-600', bg: 'bg-orange-50 dark:bg-orange-900/30', adminOnly: false },
     { id: 'preferences-mgmt', label: t.preferences, icon: Layout, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/30', adminOnly: false },
     { id: 'ai-section-anchor', label: t.aiAssistant, icon: BrainCircuit, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/30', adminOnly: false },
-    { id: 'install-section', label: t.installApp, icon: Smartphone, color: 'text-primary-600', bg: 'bg-primary-50 dark:bg-primary-900/30', adminOnly: false },
     { id: 'data-mgmt', label: isRTL ? "إدارة البيانات" : "Data Management", icon: Database, color: 'text-red-600', bg: 'bg-red-50 dark:bg-red-900/30', adminOnly: true },
+    { id: 'install-section', label: t.installApp, icon: Smartphone, color: 'text-primary-600', bg: 'bg-primary-50 dark:bg-primary-900/30', adminOnly: false },
   ].filter(item => !item.adminOnly || isAdmin);
 
   const handleVerifySuccess = (passwordInput: string) => {
@@ -281,15 +281,15 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
             <PreferencesSection t={t} data={data} setData={setData} deviceScale={deviceScale} setDeviceScale={setDeviceScale} adjustScale={adjustScale} currentTheme={currentTheme} setLocalTheme={setLocalTheme} currentLang={currentLang} setDeviceLang={setDeviceLang} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} isRTL={isRTL} onUpdateSettings={onUpdateSettings} />
           </div>
 
-          <div id="install-section" className="scroll-mt-10 animate-fade-in">
-            <InstallSection t={t} isRTL={isRTL} deferredPrompt={deferredPrompt} handleInstallApp={handleInstallApp} />
-          </div>
-
           {isAdmin && (
               <div id="data-mgmt" className="scroll-mt-10 animate-fade-in">
                 <DataManagementSection t={t} isRTL={isRTL} setShowBackupModal={setShowBackupModal} setShowRestoreModal={setShowRestoreModal} handleResetLocalData={handleResetLocalData} handleUpdateApp={handleUpdateApp} />
               </div>
           )}
+
+          <div id="install-section" className="scroll-mt-10 animate-fade-in">
+            <InstallSection t={t} isRTL={isRTL} deferredPrompt={deferredPrompt} handleInstallApp={handleInstallApp} />
+          </div>
         </div>
 
         <button 
