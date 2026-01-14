@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud, LayoutGrid, Folder, ChevronLeft, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Menu, X, Plus, Search, Trash2, Pill, WifiOff, LayoutDashboard, RefreshCw, AlertCircle, CloudCheck, Cloud, LayoutGrid, Folder, ChevronLeft, ArrowLeft, CheckCircle2, Smartphone } from 'lucide-react';
 import { ClinicData, Doctor, Secretary, Patient, Appointment, Payment, Tooth, RootCanalEntry, Memo, Prescription, Medication, SupplyItem, ExpenseItem, TodoItem, ToothSurfaces, LabOrder, InventoryItem, ToothNote, Language, MemoStyle, Examination, MedicalConditionItem, PatientQueryAnswer, MedicationCategory } from './types';
 import { INITIAL_DATA } from './initialData';
 import { LABELS } from './locales';
@@ -497,9 +496,7 @@ export default function App() {
       } catch (e: any) { console.warn("Initial sync failed, using local."); }
       
       const currentData = storageService.loadData();
-      // Always show Profile Selector upon initialization if ClinicName exists
       if (currentData && currentData.clinicName) {
-          // Check for persisted active profile to bypass selection screen
           const savedProfileType = localStorage.getItem('dentro_profile_type');
           if (savedProfileType) {
               if (savedProfileType === 'admin') {
@@ -528,7 +525,7 @@ export default function App() {
               setAppState('profile_select');
           }
       } else {
-          setAppState('app'); // This will trigger ClinicSetup inside 'app' render
+          setAppState('app'); 
       }
       setIsInitialLoading(false);
     };
@@ -547,7 +544,6 @@ export default function App() {
                 setData(newData); 
                 storageService.saveData(newData); 
                 setIsInitialLoading(false); 
-                // Redirect based on clinic setup
                 setAppState(cloudData.clinicName ? 'profile_select' : 'app');
             }
         }
@@ -556,7 +552,6 @@ export default function App() {
 
   const handleClinicNameSubmit = async (name: string) => { 
     await updateAndSync(prev => ({ ...prev, clinicName: name })); 
-    // After setup, always go to profile select
     setAppState('profile_select'); 
   };
 
@@ -831,7 +826,6 @@ export default function App() {
   if (appState === 'auth') return <AuthScreen t={currentT} loginEmail={loginEmail} setLoginEmail={setLoginEmail} loginPassword={loginPassword} setLoginPassword={setLoginPassword} authLoading={authLoading} authError={authError} handleAuth={handleAuth} setAppState={setAppState} />;
   if (appState === 'profile_select') return <ProfileSelector t={currentT} data={data} loginPassword={loginPassword} currentLang={deviceLang} isRTL={isRTL} onSelectAdmin={() => { localStorage.setItem('dentro_profile_type', 'admin'); setAppState('app'); }} onSelectDoctor={(id) => { setActiveDoctorId(id); localStorage.setItem('dentro_profile_type', 'doctor'); localStorage.setItem('dentro_active_profile', id); setAppState('app'); }} onSelectSecretary={(id) => { setActiveSecretaryId(id); localStorage.setItem('dentro_profile_type', 'secretary'); localStorage.setItem('dentro_active_secretary', id); setAppState('app'); setCurrentView('patients'); }} onLogout={() => { supabaseService.signOut(); localStorage.clear(); setAppState('landing'); }} />;
 
-  // If in 'app' state but no clinic name, show setup
   if (appState === 'app' && !data.clinicName) {
       return (
         <ClinicSetup 

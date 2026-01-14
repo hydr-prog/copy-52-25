@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Smartphone, Layout, CheckCircle2 } from 'lucide-react';
 
@@ -40,7 +39,7 @@ export const InstallSection: React.FC<InstallSectionProps> = ({
                 </div>
                 {!deferredPrompt && (
                     <span className="text-[10px] opacity-80 font-black uppercase tracking-tighter">
-                        {isRTL ? "إرشادات التثبيت اليدوي" : "Manual Install Guide"}
+                        {isRTL ? "اضغط للمساعدة في التثبيت اليدوي" : "Click for Manual Install Guide"}
                     </span>
                 )}
             </button>

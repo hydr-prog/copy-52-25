@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { googleDriveService } from '../services/googleDrive';
 import { ClinicData, Language, Doctor, Secretary } from '../types';
-import { Building2, Stethoscope, Cloud, Layout, Database, ChevronLeft, ChevronRight, BrainCircuit, ShieldCheck, Settings as SettingsIcon, Sparkles } from 'lucide-react';
+import { Building2, Stethoscope, Cloud, Layout, Database, ChevronLeft, ChevronRight, BrainCircuit, ShieldCheck, Settings as SettingsIcon, Sparkles, Smartphone } from 'lucide-react';
 
 // Sub-components imports
 import { BackupModal, RestoreModal, VerificationModal, ChangeAdminPasswordModal, DoctorDeleteChoiceModal, DoctorUpdateChoiceModal } from './settings/SettingsModals';
@@ -11,6 +10,7 @@ import { ProfilesSection } from './settings/ProfilesSection';
 import { SyncSection } from './settings/SyncSection';
 import { PreferencesSection } from './settings/PreferencesSection';
 import { DataManagementSection } from './settings/DataManagementSection';
+import { InstallSection } from './settings/InstallSection';
 
 interface SettingsViewProps {
   t: any;
@@ -38,10 +38,11 @@ interface SettingsViewProps {
   deviceScale: number;
   setDeviceScale: (scale: number) => void;
   onLinkDrive: () => void;
+  onUpdateSettings: (settings: Partial<ClinicData['settings']>) => Promise<void>;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = (props) => {
-  const { t, data, setData, handleAddDoctor, handleUpdateDoctor, handleDeleteDoctor, handleAddSecretary, handleDeleteSecretary, handleImportData, deferredPrompt, handleInstallApp, openConfirm, currentLang, setDeviceLang, currentTheme, setLocalTheme, activeThemeId, setActiveThemeId, activeDoctorId, activeSecretaryId, deviceScale, setDeviceScale, onLinkDrive } = props;
+  const { t, data, setData, handleAddDoctor, handleUpdateDoctor, handleDeleteDoctor, handleAddSecretary, handleDeleteSecretary, handleRxFileUpload, handleImportData, deferredPrompt, handleInstallApp, openConfirm, currentLang, setDeviceLang, currentTheme, setLocalTheme, activeThemeId, setActiveThemeId, activeDoctorId, activeSecretaryId, deviceScale, setDeviceScale, onLinkDrive, onUpdateSettings } = props;
   
   const [isEditingClinic, setIsEditingClinic] = useState(false);
   const [isEditingPhone, setIsEditingPhone] = useState(false);
@@ -234,7 +235,7 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
         </div>
 
         <div className="mb-16 flex justify-center w-full px-2 md:px-0">
-             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-4 md:gap-6 w-full max-w-4xl">
+             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 w-full max-w-4xl">
                   {navItems.map((item) => (
                       <button
                           key={item.id}
@@ -275,14 +276,18 @@ export const SettingsView: React.FC<SettingsViewProps> = (props) => {
           </div>
 
           <div id="preferences-mgmt" className="scroll-mt-10 animate-fade-in">
-            <PreferencesSection t={t} data={data} setData={setData} deviceScale={deviceScale} setDeviceScale={setDeviceScale} adjustScale={adjustScale} currentTheme={currentTheme} setLocalTheme={setLocalTheme} currentLang={currentLang} setDeviceLang={setDeviceLang} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} isRTL={isRTL} />
+            <PreferencesSection t={t} data={data} setData={setData} deviceScale={deviceScale} setDeviceScale={setDeviceScale} adjustScale={adjustScale} currentTheme={currentTheme} setLocalTheme={setLocalTheme} currentLang={currentLang} setDeviceLang={setDeviceLang} activeThemeId={activeThemeId} setActiveThemeId={setActiveThemeId} isRTL={isRTL} onUpdateSettings={onUpdateSettings} />
           </div>
 
           {isAdmin && (
               <div id="data-mgmt" className="scroll-mt-10 animate-fade-in">
-                <DataManagementSection t={t} isRTL={isRTL} setShowBackupModal={setShowBackupModal} setShowRestoreModal={setShowRestoreModal} handleResetLocalData={handleResetLocalData} handleUpdateApp={handleUpdateApp} deferredPrompt={deferredPrompt} handleInstallApp={handleInstallApp} />
+                <DataManagementSection t={t} isRTL={isRTL} setShowBackupModal={setShowBackupModal} setShowRestoreModal={setShowRestoreModal} handleResetLocalData={handleResetLocalData} handleUpdateApp={handleUpdateApp} />
               </div>
           )}
+
+          <div id="install-section" className="scroll-mt-10 animate-fade-in">
+            <InstallSection t={t} isRTL={isRTL} deferredPrompt={deferredPrompt} handleInstallApp={handleInstallApp} />
+          </div>
         </div>
 
         <button 
