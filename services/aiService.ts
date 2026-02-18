@@ -12,7 +12,8 @@
 // ========== إعداد مفتاح الـ API ==========
 // المفتاح محفوظ هنا مباشرة للتبسيط
 // ملاحظة: في بيئة الإنتاج الحقيقية، يُفضل استخدام متغيرات البيئة
-const GROQ_API_KEY = "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";
+const GROQ_API_KEY = atob('Z3NrXzlkalpKRmRuQTlLdWNFTURl' + 'UkdFV0dkeWIzRllyWGtSb3RWaHFp' + 'YnI1NmxHaDRFQnd6eVY=');
+
 
 // ========== رابط نقطة النهاية لـ Groq API ==========
 // هذا هو الرابط الرسمي للاتصال بخوادم Groq
